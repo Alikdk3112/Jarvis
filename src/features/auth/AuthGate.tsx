@@ -93,7 +93,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setError(null)
     const { error: err } = await supabase.auth.signInWithOtp({
       email: address,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        // origin allein reicht nicht: liegt die App in einem Unterverzeichnis
+        // (GitHub Pages: /Jarvis/), landet der Link sonst auf der leeren
+        // Wurzel statt in der App. BASE_URL trägt genau diesen Unterpfad.
+        emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
+      },
     })
     setSending(false)
     if (err) setError(err.message)
