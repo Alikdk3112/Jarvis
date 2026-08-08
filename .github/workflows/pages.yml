@@ -1,0 +1,63 @@
+# Baut die App und veröffentlicht sie auf GitHub Pages.
+#
+# Der Bau läuft auf GitHubs Runnern, nicht lokal — deshalb müssen die beiden
+# Supabase-Werte als Repository-Secrets hinterlegt sein. Fehlen sie, baut die
+# App trotzdem, läuft dann aber im lokalen Modus (Daten nur im Browser).
+name: Pages
+
+on:
+  push:
+    branches: [main, claude/personal-jarvis-assistant-1c9fye]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Nie zwei Veröffentlichungen gleichzeitig; laufende dürfen fertig werden.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typen prüfen
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Bauen
+        env:
+          BASE_PATH: /Jarvis/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      # GitHub Pages kennt keine Umleitungen: ohne diese Kopie liefert ein
+      # direkter Aufruf von /Jarvis/habits einen 404 statt der App.
+      - name: Tiefe Links ermöglichen
+        run: cp dist/index.html dist/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

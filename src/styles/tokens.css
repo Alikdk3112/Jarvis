@@ -1,0 +1,149 @@
+/* ══════════════════════════════════════════════════════════════════════
+   JARVIS — Design-Tokens
+   Eine einzige Wahrheitsquelle für Farbe, Schrift und Radien.
+   Werte unverändert aus dem freigegebenen Entwurf 03.
+
+   Bewusst ein einziges, dunkles Farbklima: ein HUD im Hellmodus wäre
+   kein HUD mehr. Deshalb kein prefers-color-scheme-Zweig.
+   ══════════════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'Jura';
+  src: url('/fonts/Jura-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Jura';
+  src: url('/fonts/Jura-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DMM';
+  src: url('/fonts/DMMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Outfit';
+  src: url('/fonts/Outfit-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Outfit';
+  src: url('/fonts/Outfit-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #05070a;
+  --text: #dce9f2;
+  --dim: #6c8194;          /* Neutral mit Blaubias — passt zum Cyan */
+  --dimmer: #3b4b59;
+
+  /* Signalfarben: jede hat genau eine Aufgabe */
+  --accent: #00e5ff;       /* System, Rahmenlicht, Tasks */
+  --habits: #00ff9d;
+  --study: #a855f7;        /* Lernen und Uni */
+  --journal: #ffb000;
+  --sport: #ff6b35;
+  --goals: #ff2d95;
+  --alert: #ff3b30;        /* ausschließlich Warnung */
+
+  /* Glas: heller Verlauf von oben über halbtransparentem Blauschwarz */
+  --glass: linear-gradient(
+      168deg,
+      rgba(255, 255, 255, 0.075),
+      rgba(255, 255, 255, 0.018) 38%,
+      rgba(255, 255, 255, 0.004) 100%
+    ),
+    rgba(11, 17, 25, 0.62);
+  --glass-edge: rgba(255, 255, 255, 0.075);
+  --glass-lift: inset 0 1px 0 rgba(255, 255, 255, 0.11), 0 24px 48px -30px rgba(0, 0, 0, 0.95);
+  --hairline: rgba(255, 255, 255, 0.045);
+
+  --disp: 'Jura', system-ui, sans-serif;
+  --mono: 'DMM', ui-monospace, Menlo, Consolas, monospace;
+  --body: 'Outfit', system-ui, sans-serif;
+
+  /* Modulfarbe der aktuellen Umgebung. Wird von .m-* überschrieben. */
+  --pc: var(--accent);
+
+  --r-tile: 26px;
+  --r-tile-sm: 22px;
+  --r-pill: 999px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Modulfarbe: setzt --pc, das jede HUD-Komponente aufgreift */
+.m-accent { --pc: var(--accent); }
+.m-habits { --pc: var(--habits); }
+.m-study { --pc: var(--study); }
+.m-journal { --pc: var(--journal); }
+.m-sport { --pc: var(--sport); }
+.m-goals { --pc: var(--goals); }
+.m-alert { --pc: var(--alert); }
+
+/* Nur für Screenreader — die Icon-Navigation braucht lesbare Beschriftungen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
