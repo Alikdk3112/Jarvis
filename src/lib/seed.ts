@@ -6,7 +6,9 @@
    die Vorschau. Alles davon lässt sich in den Modulen ändern oder löschen. */
 
 import { data } from './data'
-import type { Habit, Task, Course, Goal, Workout, JournalEntry, StudySession } from './data/types'
+import type {
+  Habit, HabitEntry, Task, Course, Goal, Workout, JournalEntry, StudySession,
+} from './data/types'
 import { addDays, today, toKey } from './date'
 import { newId } from './id'
 
@@ -35,7 +37,7 @@ export async function seedIfEmpty(): Promise<void> {
     { id: newId(), name: 'Kein Handy vor 9', color: 'habits', targetPerWeek: 5, sortOrder: 3, archived: false, createdAt: now() },
     { id: newId(), name: 'Karten wiederholen', color: 'habits', targetPerWeek: 6, sortOrder: 4, archived: false, createdAt: now() },
   ]
-  for (const h of habits) await data.habits.put(h)
+  await data.habits.putMany(habits)
 
   // Ein paar Wochen Verlauf, damit Heatmap und Serien nicht bei null starten.
   // Fester Zufall: dieselbe Vorgeschichte bei jeder Installation.
@@ -44,6 +46,7 @@ export async function seedIfEmpty(): Promise<void> {
     seed = (seed * 1103515245 + 12345) % 2147483648
     return seed / 2147483648
   }
+  const entries: HabitEntry[] = []
   for (let back = 90; back >= 1; back--) {
     const date = addDays(t, -back)
     // Jeder fünfte Tag fällt ganz aus — sonst entstünden Serien über Monate
@@ -51,13 +54,14 @@ export async function seedIfEmpty(): Promise<void> {
     if (rnd() < 0.2) continue
     for (const h of habits) {
       if (rnd() < (h.targetPerWeek / 7) * 0.85) {
-        await data.habitEntries.put({ id: newId(), habitId: h.id, date, done: true })
+        entries.push({ id: newId(), habitId: h.id, date, done: true })
       }
     }
   }
   // Heute: zwei erledigt, drei offen — wie in der Vorschau
-  await data.habitEntries.put({ id: newId(), habitId: habits[0].id, date: t, done: true })
-  await data.habitEntries.put({ id: newId(), habitId: habits[1].id, date: t, done: true })
+  entries.push({ id: newId(), habitId: habits[0].id, date: t, done: true })
+  entries.push({ id: newId(), habitId: habits[1].id, date: t, done: true })
+  await data.habitEntries.putMany(entries)
 
   const courses: Course[] = [
     { id: newId(), name: 'Operations Research', ects: 6, semester: 'SoSe 26', examDate: addDays(t, 12), grade: null, passed: false, createdAt: now() },
@@ -65,7 +69,7 @@ export async function seedIfEmpty(): Promise<void> {
     { id: newId(), name: 'Mikroökonomie', ects: 6, semester: 'WiSe 25', examDate: null, grade: 1.7, passed: true, createdAt: now() },
     { id: newId(), name: 'Wirtschaftsinformatik', ects: 5, semester: 'WiSe 25', examDate: null, grade: 2.0, passed: true, createdAt: now() },
   ]
-  for (const c of courses) await data.courses.put(c)
+  await data.courses.putMany(courses)
 
   const tasks: Task[] = [
     { id: newId(), title: 'Übungsblatt 3 rechnen', notes: null, dueAt: `${t}T18:00`, tag: 'uni', done: false, doneAt: null, createdAt: now() },
@@ -74,21 +78,21 @@ export async function seedIfEmpty(): Promise<void> {
     { id: newId(), title: 'Supabase-Projekt anlegen', notes: 'Danach URL und anon key in .env.local eintragen.', dueAt: `${addDays(t, 5)}T12:00`, tag: 'jarvis', done: false, doneAt: null, createdAt: now() },
     { id: newId(), title: 'Skript Kapitel 1–3 drucken', notes: null, dueAt: null, tag: 'uni', done: true, doneAt: now(), createdAt: now() },
   ]
-  for (const task of tasks) await data.tasks.put(task)
+  await data.tasks.putMany(tasks)
 
   const goals: Goal[] = [
     { id: newId(), title: 'Klausur OR bestehen', description: null, targetDate: addDays(t, 12), progress: 64, status: 'active', createdAt: now() },
     { id: newId(), title: 'JARVIS v1 fertig', description: null, targetDate: addDays(t, 41), progress: 18, status: 'active', createdAt: now() },
     { id: newId(), title: '3× Sport pro Woche halten', description: null, targetDate: null, progress: 83, status: 'active', createdAt: now() },
   ]
-  for (const g of goals) await data.goals.put(g)
+  await data.goals.putMany(goals)
 
   const workouts: Workout[] = [
     { id: newId(), date: addDays(t, -1), type: 'Push · Bank, Schulter, Trizeps', minutes: 52, note: null, createdAt: now() },
     { id: newId(), date: addDays(t, -3), type: 'Laufen · 5,2 km', minutes: 28, note: '27:40', createdAt: now() },
     { id: newId(), date: addDays(t, -5), type: 'Pull · Rudern, Klimmzüge', minutes: 48, note: null, createdAt: now() },
   ]
-  for (const w of workouts) await data.workouts.put(w)
+  await data.workouts.putMany(workouts)
 
   const journal: JournalEntry[] = [
     { id: newId(), date: t, body: 'Vormittag war stark — zwei Timer-Blöcke OR durchgezogen, Simplex sitzt jetzt endlich. Nachmittags war die Luft raus. Fürs Wochenende: Übungsblatt 3 zuerst, dann Statistik.', createdAt: now(), updatedAt: now() },
@@ -96,7 +100,7 @@ export async function seedIfEmpty(): Promise<void> {
     { id: newId(), date: addDays(t, -2), body: 'Dualität verstanden. Push-Training war gut, Bank 3×8 bei 70 kg.', createdAt: now(), updatedAt: now() },
     { id: newId(), date: addDays(t, -3), body: 'Nichts gemacht. Passiert, morgen wieder.', createdAt: now(), updatedAt: now() },
   ]
-  for (const j of journal) await data.journal.put(j)
+  await data.journal.putMany(journal)
 
   // Lernzeit der letzten zwei Wochen — speist Kurve und Wochensumme
   const minutesBack = [80, 64, 20, 47, 56, 32, 71, 15, 52, 38, 62, 27, 43, 45]
@@ -111,5 +115,5 @@ export async function seedIfEmpty(): Promise<void> {
       note: null,
     }
   })
-  for (const s of sessions) await data.studySessions.put(s)
+  await data.studySessions.putMany(sessions)
 }

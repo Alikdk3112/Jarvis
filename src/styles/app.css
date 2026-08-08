@@ -345,6 +345,43 @@
 .page__r { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(0, 229, 255, 0.28), transparent); }
 .cols { display: grid; gap: 15px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
 
+/* ── Fehlerstreifen ───────────────────────────────────────────────── */
+.errbar {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  translate: -50% 0;
+  top: calc(14px + env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  max-width: min(560px, calc(100vw - 28px));
+  padding: 11px 17px;
+  border: 1px solid color-mix(in srgb, var(--alert) 45%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--alert) 16%, rgba(11, 17, 25, 0.94));
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.4;
+  box-shadow: var(--glass-lift);
+  animation: errbar-in 0.25s ease-out;
+}
+.errbar svg { width: 13px; height: 13px; flex: none; color: var(--dim); }
+.errbar__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--alert);
+  box-shadow: 0 0 9px var(--alert);
+}
+@keyframes errbar-in {
+  from { opacity: 0; translate: -50% -8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .errbar { animation: none; }
+}
+
 /* ── Handy: gestapelt, schwebende Kapsel-Navigation ───────────────── */
 .tabbar { display: none; }
 

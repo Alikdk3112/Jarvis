@@ -135,6 +135,23 @@ supabase/migrations/
 
 Alle Diagramme sind eigene SVG- und Canvas-Komponenten — bewusst keine Chart-Library.
 
+## Warum Änderungen sofort greifen
+
+Jede Änderung landet erst im Zwischenspeicher und wird danach geschrieben
+(`onMutate` in `src/lib/store.ts`). Vorher wartete die Oberfläche auf zwei
+Rundreisen — Schreiben und Neuladen — und stand bis dahin still. Lokal fiel das
+nie auf, weil IndexedDB sofort antwortet; über Mobilfunk fühlte es sich wie ein
+Hänger an.
+
+Gemessen mit künstlich auf 1,5 s verzögertem Schreibvorgang: **Haken sichtbar
+nach 13 ms.** Schlägt das Schreiben fehl, springt der alte Stand zurück und der
+Grund erscheint als Streifen oben (`src/components/ErrorBar.tsx`) — vorher
+verpuffte ein Fehlschlag lautlos, was ebenfalls wie ein Hänger wirkte.
+
+Aus demselben Grund schreibt die Erstbefüllung gebündelt (`putMany`): rund 420
+Zeilen einzeln wären ebenso viele Netzanfragen und hätten den ersten Login
+minutenlang blockiert.
+
 ## Warum kein `backdrop-filter`
 
 Die Glasoptik kam ursprünglich von `backdrop-filter: blur()` auf jeder Kachel, Pille,

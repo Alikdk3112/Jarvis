@@ -145,6 +145,9 @@ export const DEFAULT_SETTINGS: Settings = {
 export interface Repo<T extends { id: ID }> {
   list(): Promise<T[]>
   put(item: T): Promise<T>
+  /** Viele Zeilen auf einmal. Einzeln geschrieben wären das ebenso viele
+   *  Netzanfragen — die Erstbefüllung allein bräuchte so Minuten. */
+  putMany(items: T[]): Promise<void>
   remove(id: ID): Promise<void>
 }
 

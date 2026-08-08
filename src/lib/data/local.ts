@@ -69,6 +69,9 @@ function repo<T extends { id: ID }>(table: Table<T, ID>): Repo<T> {
       await table.put(item)
       return item
     },
+    async putMany(items) {
+      if (items.length) await table.bulkPut(items)
+    },
     async remove(id) {
       await table.delete(id)
     },

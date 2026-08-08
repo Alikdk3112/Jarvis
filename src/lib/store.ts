@@ -7,6 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { data } from './data'
+import { reportError } from './errors'
 import {
   DEFAULT_SETTINGS,
   type Course,
@@ -53,14 +54,43 @@ export function useCollection<K extends CollectionKey>(key: K) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: [key] })
 
+  /* Änderungen greifen sofort im Zwischenspeicher und werden erst danach
+     geschrieben. Vorher wartete die Oberfläche auf zwei Rundreisen — Schreiben
+     und Neuladen — und stand bis dahin still; über Mobilfunk fühlt sich das
+     wie ein Hänger an. Schlägt das Schreiben fehl, wird der alte Stand
+     zurückgesetzt und der Fehler sichtbar gemacht, statt still zu verpuffen. */
   const put = useMutation({
     mutationFn: (item: Collections[K]) => repo.put(item),
-    onSuccess: invalidate,
+    onMutate: async (item) => {
+      await qc.cancelQueries({ queryKey: [key] })
+      const prev = qc.getQueryData<Collections[K][]>([key]) ?? []
+      const exists = prev.some((x) => x.id === item.id)
+      qc.setQueryData<Collections[K][]>(
+        [key],
+        exists ? prev.map((x) => (x.id === item.id ? item : x)) : [...prev, item],
+      )
+      return { prev }
+    },
+    onError: (err, _item, ctx) => {
+      if (ctx?.prev) qc.setQueryData([key], ctx.prev)
+      reportError(err)
+    },
+    onSettled: invalidate,
   })
 
   const remove = useMutation({
     mutationFn: (id: ID) => repo.remove(id),
-    onSuccess: invalidate,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: [key] })
+      const prev = qc.getQueryData<Collections[K][]>([key]) ?? []
+      qc.setQueryData<Collections[K][]>([key], prev.filter((x) => x.id !== id))
+      return { prev }
+    },
+    onError: (err, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData([key], ctx.prev)
+      reportError(err)
+    },
+    onSettled: invalidate,
   })
 
   return {
@@ -80,6 +110,15 @@ export function useSettings() {
   })
   const save = useMutation({
     mutationFn: (patch: Partial<Settings>) => data.saveSettings(patch),
+    onMutate: async (patch) => {
+      const prev = qc.getQueryData<Settings>(['settings'])
+      if (prev) qc.setQueryData(['settings'], { ...prev, ...patch })
+      return { prev }
+    },
+    onError: (err, _patch, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['settings'], ctx.prev)
+      reportError(err)
+    },
     onSuccess: (next) => qc.setQueryData(['settings'], next),
   })
   return {

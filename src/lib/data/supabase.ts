@@ -72,6 +72,17 @@ function repo<T extends { id: ID }>(table: string, orderBy?: string): Repo<T> {
       if (error) throw error
       return item
     },
+    async putMany(items) {
+      if (!items.length) return
+      const userId = await currentUserId()
+      // In Blöcken, damit eine einzelne Anfrage nicht zu groß wird.
+      for (let i = 0; i < items.length; i += 500) {
+        const { error } = await requireSupabase()
+          .from(table)
+          .upsert(items.slice(i, i + 500).map((x) => modelToRow(x, userId)), { onConflict: 'id' })
+        if (error) throw error
+      }
+    },
     async remove(id) {
       const { error } = await requireSupabase().from(table).delete().eq('id', id)
       if (error) throw error

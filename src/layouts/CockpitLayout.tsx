@@ -5,6 +5,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { AmbientLayer } from '../components/AmbientLayer'
+import { ErrorBar } from '../components/ErrorBar'
 import { Icon, type IconName } from '../components/hud'
 import { useSettings } from '../lib/store'
 import { longDate, pad2, today } from '../lib/date'
@@ -49,6 +50,7 @@ export function CockpitLayout() {
   return (
     <>
       <AmbientLayer enabled={settings.ambient} />
+      <ErrorBar />
 
       <div className="shell">
         <nav className="rail" aria-label="Module">
