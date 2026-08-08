@@ -22,6 +22,7 @@ export default defineConfig({
         name: 'JARVIS',
         short_name: 'JARVIS',
         description: 'Persönliches Cockpit — Habits, Aufgaben, Lernen, Ziele, Journal',
+        id: base,
         lang: 'de',
         start_url: base,
         scope: base,

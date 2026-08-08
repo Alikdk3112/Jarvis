@@ -96,6 +96,12 @@ body {
   padding: 0;
 }
 
+/* Der Grund gehört auch aufs html-Element: sonst blitzt beim Gummiband-
+   Scrollen in iOS Weiß hinter der Seite auf. */
+html {
+  background: var(--bg);
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -104,6 +110,24 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overflow-x: clip;
+  /* Safari vergrößert sonst Text im Querformat eigenmächtig. */
+  -webkit-text-size-adjust: 100%;
+  /* Der graue Blitz beim Antippen lässt Webseiten billig wirken. */
+  -webkit-tap-highlight-color: transparent;
+  /* Kein Überziehen nach unten — in einer installierten App fehl am Platz. */
+  overscroll-behavior-y: none;
+}
+
+/* Langes Drücken soll keine Textauswahl auslösen, sondern sich wie in einer
+   nativen App anfühlen. Eingabefelder bleiben ausgenommen. */
+button,
+a,
+.chk,
+.dots,
+.dmap {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 h1,

@@ -58,7 +58,11 @@
   gap: 18px;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 18px 20px 26px;
+  /* Die Statusleiste liegt bei installierten iOS-Apps über dem Inhalt
+     (black-translucent), deshalb oben den Sicherheitsabstand einrechnen.
+     Auf allen anderen Geräten sind die env()-Werte schlicht 0. */
+  padding: max(18px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 26px
+    max(20px, env(safe-area-inset-left));
 }
 .shell__main {
   flex: 1;
@@ -345,7 +349,14 @@
 .tabbar { display: none; }
 
 @media (max-width: 900px) {
-  .shell { padding: 12px 13px 96px; gap: 0; }
+  .shell {
+    gap: 0;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(13px, env(safe-area-inset-right));
+    padding-left: max(13px, env(safe-area-inset-left));
+    /* Platz für die schwebende Navigation plus Home-Indikator. */
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
   .rail { display: none; }
   .band { flex-direction: column; }
   .hub { grid-template-columns: 1fr; gap: 14px; justify-items: center; }
@@ -364,9 +375,10 @@
   .tabbar {
     position: fixed;
     z-index: 40;
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    /* Über dem Home-Indikator, nicht darunter. */
+    bottom: calc(12px + env(safe-area-inset-bottom));
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     padding: 7px;

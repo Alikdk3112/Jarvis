@@ -161,6 +161,27 @@ die Drehung ist zu langsam, als dass man den Unterschied sähe.
 Jura, DM Mono und Outfit liegen unter `public/fonts/` und stehen unter der
 [SIL Open Font License](https://scripts.sil.org/OFL); die Lizenztexte liegen daneben.
 
+## Auf iPhone und Mac installieren
+
+**iPhone:** Seite in Safari öffnen → Teilen → *Zum Home-Bildschirm*.
+**Mac:** Safari 17+ → Ablage → *Zum Dock hinzufügen*. Chrome/Edge: Installieren-Symbol in der Adressleiste.
+
+iOS liest das Web-Manifest nur teilweise; die Angaben dafür stehen deshalb zusätzlich als
+Apple-Meta-Tags in `index.html`:
+
+- `apple-touch-icon` — **ohne dieses Symbol nimmt iOS einen Screenshot der Seite als App-Icon**
+- `apple-mobile-web-app-status-bar-style: black-translucent` — die Statusleiste übernimmt den
+  dunklen Grund, statt als heller Balken darüber zu liegen
+- 16 `apple-touch-startup-image` für acht iPhone-Größen, hoch und quer — ohne sie zeigt iOS
+  beim Öffnen eine weiße Fläche, was bei einer durchweg dunklen App unangenehm auffällt
+
+Weil die Statusleiste über dem Inhalt liegt, rechnet das CSS die Sicherheitsabstände ein
+(`env(safe-area-inset-*)` in `.shell` und `.tabbar`). Auf allen anderen Geräten sind diese
+Werte 0, das Layout ändert sich dort also nicht.
+
+Eingabefelder sind auf Fingerbedienung 16 px groß: **unterhalb davon zoomt Safari beim
+Antippen in das Feld hinein und kommt nicht von allein zurück.**
+
 ## Bedienung
 
 - **Reduzierte Bewegung** im Betriebssystem schaltet alle Animationen ab und zeigt sofort

@@ -53,7 +53,9 @@ function Shell({ children }: { children: ReactNode }) {
           minHeight: '100dvh',
           display: 'grid',
           placeItems: 'center',
-          padding: 24,
+          padding:
+            'max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))' +
+            ' max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left))',
         }}
       >
         <div style={{ width: 'min(420px, 100%)', display: 'flex', flexDirection: 'column', gap: 22 }}>
