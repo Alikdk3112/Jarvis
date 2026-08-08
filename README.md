@@ -71,11 +71,16 @@ und beide belegt waren.
    VITE_SUPABASE_URL=…
    VITE_SUPABASE_ANON_KEY=…
    ```
-2. Neu starten → es erscheint der Anmeldebildschirm. E-Mail eintragen, Link aus der Mail öffnen.
+2. Neu starten → es erscheint der Anmeldebildschirm: E-Mail und Passwort.
+   Beim ersten Mal *Noch kein Konto?* → Konto anlegen (mindestens 8 Zeichen).
 3. Unter *Einstellungen → Daten* die lokale Sicherung einlesen.
 
 Für ein frisches Projekt stattdessen `supabase/migrations/0001_schema.sql` im SQL-Editor
 ausführen — die Datei ist auf dem eingespielten Stand.
+
+Angemeldet wird mit E-Mail und Passwort (`signInWithPassword`). Kein Magic Link: der Umweg
+übers Postfach bei jeder Anmeldung war lästiger als ein Passwort. Supabase speichert nur den
+Hash, nie das Passwort selbst.
 
 Nur Adressen aus der Tabelle `allowed_emails` können ein Konto anlegen — ein Trigger auf
 `auth.users` bricht sonst ab. Geprüft: eine fremde Adresse wird abgewiesen, die

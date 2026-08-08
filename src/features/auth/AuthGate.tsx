@@ -1,12 +1,18 @@
 /* ══════════════════════════════════════════════════════════════════════
-   Anmeldung.
+   Anmeldung mit E-Mail und Passwort.
 
    Im lokalen Modus gibt es keine — die Daten liegen im Browser, ein Login
    wäre reine Schikane. Sobald Supabase konfiguriert ist, schiebt sich diese
-   Hürde davor: Anmeldung per Magic Link, ohne Passwort.
+   Hürde davor.
 
-   Wer sich registrieren darf, entscheidet die Datenbank, nicht diese Datei:
-   ein Trigger auf auth.users lässt nur Adressen aus `allowed_emails` durch.
+   Bewusst kein Magic Link mehr: der Umweg übers Postfach bei jeder Anmeldung
+   war lästiger als ein Passwort. Kennung ist die E-Mail-Adresse, weil
+   Supabase darüber anmeldet — ein frei gewählter Benutzername bräuchte eine
+   zusätzliche Übersetzungstabelle samt öffentlicher Abfrage.
+
+   Wer sich registrieren darf, entscheidet weiterhin die Datenbank, nicht
+   diese Datei: ein Trigger auf auth.users lässt nur Adressen aus
+   `allowed_emails` durch.
    ══════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -15,6 +21,26 @@ import { hasSupabase, supabase } from '../../lib/supabaseClient'
 import { useRefreshAll } from '../../lib/store'
 import { seedIfEmpty } from '../../lib/seed'
 import { AmbientLayer } from '../../components/AmbientLayer'
+
+const MIN_PASSWORD = 8
+
+/** Supabase antwortet auf Englisch und oft technisch. Hier die Fälle, die
+ *  tatsächlich vorkommen, in verständlichem Deutsch. */
+function humanError(message: string): string {
+  const m = message.toLowerCase()
+  if (m.includes('invalid login credentials')) return 'E-Mail oder Passwort stimmt nicht.'
+  if (m.includes('email not confirmed'))
+    return 'Die Adresse ist noch nicht bestätigt — schau einmalig in dein Postfach.'
+  if (m.includes('user already registered') || m.includes('already been registered'))
+    return 'Für diese Adresse gibt es schon ein Konto. Melde dich einfach an.'
+  if (m.includes('password should be')) return `Das Passwort braucht mindestens ${MIN_PASSWORD} Zeichen.`
+  if (m.includes('rate limit') || m.includes('too many'))
+    return 'Zu viele Versuche. Warte einen Moment und probier es erneut.'
+  // Der allowed_emails-Trigger bricht ab; Supabase meldet das nur allgemein.
+  if (m.includes('database error saving new user'))
+    return 'Diese Adresse ist für JARVIS nicht freigeschaltet.'
+  return message
+}
 
 function Shell({ children }: { children: ReactNode }) {
   return (
@@ -42,14 +68,19 @@ function Shell({ children }: { children: ReactNode }) {
   )
 }
 
+type Mode = 'signin' | 'signup'
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const refreshAll = useRefreshAll()
   const [session, setSession] = useState<Session | null>(null)
   const [checking, setChecking] = useState(hasSupabase)
+
+  const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
     if (!supabase) return
@@ -85,77 +116,139 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (session) return <>{children}</>
 
-  async function signIn(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (!supabase) return
     const address = email.trim()
-    if (!address || !supabase) return
-    setSending(true)
+    if (!address || password.length < MIN_PASSWORD) return
+
+    setBusy(true)
     setError(null)
-    const { error: err } = await supabase.auth.signInWithOtp({
+    setNotice(null)
+
+    if (mode === 'signin') {
+      const { error: err } = await supabase.auth.signInWithPassword({ email: address, password })
+      setBusy(false)
+      if (err) setError(humanError(err.message))
+      return
+    }
+
+    const { data, error: err } = await supabase.auth.signUp({
       email: address,
-      options: {
-        // origin allein reicht nicht: liegt die App in einem Unterverzeichnis
-        // (GitHub Pages: /Jarvis/), landet der Link sonst auf der leeren
-        // Wurzel statt in der App. BASE_URL trägt genau diesen Unterpfad.
-        emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
-      },
+      password,
+      options: { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
     })
-    setSending(false)
-    if (err) setError(err.message)
-    else setSent(true)
+    setBusy(false)
+    if (err) {
+      setError(humanError(err.message))
+      return
+    }
+    // Ist die Bestätigung per Mail eingeschaltet, kommt zwar ein Nutzer
+    // zurück, aber keine Sitzung — dann muss erst der Link geklickt werden.
+    if (!data.session) {
+      setNotice('Konto angelegt. Bestätige einmalig den Link in deiner E-Mail — danach reicht immer das Passwort.')
+      setMode('signin')
+    }
   }
+
+  async function resetPassword() {
+    if (!supabase) return
+    const address = email.trim()
+    if (!address) {
+      setError('Trag zuerst deine E-Mail-Adresse ein.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    const { error: err } = await supabase.auth.resetPasswordForEmail(address, {
+      redirectTo: window.location.origin + import.meta.env.BASE_URL,
+    })
+    setBusy(false)
+    if (err) setError(humanError(err.message))
+    else setNotice('Link zum Zurücksetzen ist unterwegs.')
+  }
+
+  const tooShort = password.length > 0 && password.length < MIN_PASSWORD
 
   return (
     <Shell>
       <section className="tile">
         <header className="tile__h">
           <span className="orb" />
-          <span className="tile__t">Anmeldung</span>
+          <span className="tile__t">{mode === 'signin' ? 'Anmeldung' : 'Konto anlegen'}</span>
         </header>
 
-        {sent ? (
-          <>
-            <p style={{ fontSize: 15, lineHeight: 1.6 }}>
-              Link ist unterwegs an <b>{email}</b>. Öffne ihn auf diesem Gerät — danach bist du drin.
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            className="inp"
+            type="email"
+            autoComplete="username"
+            required
+            placeholder="E-Mail-Adresse"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            aria-label="E-Mail-Adresse"
+          />
+          <input
+            className="inp"
+            type="password"
+            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+            required
+            minLength={MIN_PASSWORD}
+            placeholder="Passwort"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-label="Passwort"
+          />
+
+          {mode === 'signup' && (
+            <p className="row__v" style={{ whiteSpace: 'normal', lineHeight: 1.7 }}>
+              MINDESTENS {MIN_PASSWORD} ZEICHEN · NUR FREIGESCHALTETE ADRESSEN KÖNNEN EIN KONTO ANLEGEN
             </p>
-            <button
-              type="button"
-              className="btn"
-              style={{ marginTop: 16, alignSelf: 'flex-start' }}
-              onClick={() => {
-                setSent(false)
-                setError(null)
-              }}
+          )}
+
+          <button type="submit" className="btn btn--p" disabled={busy || !email.trim() || tooShort}>
+            {busy ? 'Moment …' : mode === 'signin' ? 'Anmelden' : 'Konto anlegen'}
+          </button>
+
+          {error && (
+            <p
+              className="row__v"
+              style={{ color: 'var(--alert)', whiteSpace: 'normal', lineHeight: 1.7 }}
+              role="alert"
             >
-              Andere Adresse
-            </button>
-          </>
-        ) : (
-          <form onSubmit={signIn} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <p style={{ fontSize: 14.5, color: 'var(--dim)', lineHeight: 1.6 }}>
-              Kein Passwort — du bekommst einen Link per E-Mail. Nur freigeschaltete Adressen
-              können ein Konto anlegen.
+              {error}
             </p>
-            <input
-              className="inp"
-              type="email"
-              autoComplete="email"
-              required
-              placeholder="deine@adresse.de"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              aria-label="E-Mail-Adresse"
-            />
-            <button type="submit" className="btn btn--p" disabled={sending || !email.trim()}>
-              {sending ? 'Sende …' : 'Link anfordern'}
+          )}
+          {notice && (
+            <p
+              className="row__v"
+              style={{ color: 'var(--habits)', whiteSpace: 'normal', lineHeight: 1.7 }}
+              role="status"
+            >
+              {notice}
+            </p>
+          )}
+        </form>
+
+        <div style={{ display: 'flex', gap: 9, marginTop: 16, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn--sm"
+            onClick={() => {
+              setMode(mode === 'signin' ? 'signup' : 'signin')
+              setError(null)
+              setNotice(null)
+            }}
+          >
+            {mode === 'signin' ? 'Noch kein Konto?' : 'Zurück zur Anmeldung'}
+          </button>
+          {mode === 'signin' && (
+            <button type="button" className="btn btn--sm" onClick={() => void resetPassword()} disabled={busy}>
+              Passwort vergessen
             </button>
-            {error && (
-              <p className="row__v" style={{ color: 'var(--alert)', whiteSpace: 'normal' }} role="alert">
-                {error}
-              </p>
-            )}
-          </form>
-        )}
+          )}
+        </div>
       </section>
     </Shell>
   )
@@ -165,11 +258,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 export function SignOutButton() {
   if (!hasSupabase) return null
   return (
-    <button
-      type="button"
-      className="btn"
-      onClick={() => void supabase?.auth.signOut()}
-    >
+    <button type="button" className="btn" onClick={() => void supabase?.auth.signOut()}>
       Abmelden
     </button>
   )
