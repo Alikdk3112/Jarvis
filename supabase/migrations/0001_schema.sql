@@ -1,7 +1,7 @@
 -- ═════════════════════════════════════════════════════════════════════
 -- JARVIS — Schema, Row Level Security und Zugangsbeschränkung
 --
--- Eingespielt im Projekt "PrivateApp" (jfhxgcrvdvltnkhdzkmt) — dort lag
+-- Eingespielt in ein bestehendes Supabase-Projekt — dort lag
 -- bereits eine fremde Tabelle (dashboard_state), die unberührt bleibt.
 -- Ein eigenes Projekt war nicht möglich: der kostenlose Tarif erlaubt zwei
 -- aktive Projekte, beide waren belegt.

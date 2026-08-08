@@ -91,9 +91,31 @@ insert into public.allowed_emails (email) values ('…') on conflict do nothing;
 
 ## Veröffentlichen
 
-`vercel.json` liegt bereit. Repo einmal mit dem Vercel-Konto verbinden, die beiden
-Umgebungsvariablen dort eintragen — fertig. Ohne sie läuft die App im lokalen Modus,
-ist also auch ohne Backend sofort deploybar.
+### GitHub Pages (eingerichtet)
+
+`.github/workflows/pages.yml` baut bei jedem Push auf `main` oder den Arbeitsbranch
+und veröffentlicht nach GitHub Pages. Einmalig nötig:
+
+1. Repo auf **öffentlich** stellen (Pages ist bei privaten Repos kostenpflichtig)
+2. *Settings → Pages → Source:* **GitHub Actions**
+3. *Settings → Secrets and variables → Actions* → zwei Secrets anlegen:
+   `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY`
+4. In Supabase unter *Authentication → URL Configuration* die Pages-Adresse als
+   Site-URL und Redirect-URL eintragen — sonst führt der Magic Link ins Leere
+
+Die Seite liegt danach unter `https://<konto>.github.io/Jarvis/`.
+
+Der Unterpfad ist der Grund für `BASE_PATH` in `vite.config.ts`: GitHub Pages liefert
+Projektseiten nicht unter `/` aus. Lokal bleibt es `/`, `npm run dev` ändert sich nicht.
+`404.html` ist eine Kopie von `index.html` — ohne sie ergibt ein direkter Aufruf von
+`/Jarvis/habits` einen 404, weil Pages keine Umleitungen kennt.
+
+### Vercel (Alternative)
+
+`vercel.json` liegt ebenfalls bereit. Repo mit dem Vercel-Konto verbinden, dieselben zwei
+Variablen eintragen — dort entfällt der Unterpfad, die App liegt direkt auf `/`.
+
+Ohne die Variablen läuft die App im lokalen Modus, ist also auch ohne Backend deploybar.
 
 ## Aufbau
 
