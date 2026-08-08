@@ -11,6 +11,7 @@ import { useRefreshAll, useSettings } from '../lib/store'
 import { data, isLocalMode } from '../lib/data'
 import type { Backup } from '../lib/data/types'
 import { useSound } from '../hooks/useSound'
+import { SignOutButton } from '../features/auth/AuthGate'
 
 function Toggle({
   label,
@@ -172,6 +173,7 @@ export function Settings() {
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
             Sicherung einlesen
           </button>
+          <SignOutButton />
           <input
             ref={fileRef}
             type="file"

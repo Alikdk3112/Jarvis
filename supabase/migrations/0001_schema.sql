@@ -1,10 +1,14 @@
 -- ═════════════════════════════════════════════════════════════════════
 -- JARVIS — Schema, Row Level Security und Zugangsbeschränkung
 --
--- Noch nicht eingespielt: die App läuft zunächst mit lokaler Speicherung
--- (IndexedDB). Sobald ein Supabase-Projekt existiert, wird diese Datei
--- ausgeführt und VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY gesetzt —
--- dann schaltet src/lib/data/index.ts automatisch um.
+-- Eingespielt im Projekt "PrivateApp" (jfhxgcrvdvltnkhdzkmt) — dort lag
+-- bereits eine fremde Tabelle (dashboard_state), die unberührt bleibt.
+-- Ein eigenes Projekt war nicht möglich: der kostenlose Tarif erlaubt zwei
+-- aktive Projekte, beide waren belegt.
+--
+-- Wer diese Datei auf einem frischen Projekt ausführt, bekommt denselben
+-- Stand. VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY setzen — dann schaltet
+-- src/lib/data/index.ts automatisch um.
 --
 -- Grundregeln:
 --   • jede Tabelle trägt user_id und ist per RLS auf auth.uid() beschränkt
@@ -180,11 +184,22 @@ create table if not exists public.allowed_emails (
   email text primary key
 );
 alter table public.allowed_emails enable row level security;
--- Kein Client-Zugriff: die Tabelle wird ausschließlich im SQL-Editor gepflegt.
+-- RLS an, aber bewusst ohne Policy: das bedeutet "für Clients unsichtbar".
+-- Gepflegt wird die Tabelle ausschließlich im SQL-Editor.
+comment on table public.allowed_emails is
+  'Wer ein Konto anlegen darf. Bewusst ohne RLS-Policy: kein Client-Zugriff. Pflege nur im SQL-Editor.';
 
 insert into public.allowed_emails (email)
 values ('ali.kodak@outlook.de')
 on conflict (email) do nothing;
+
+-- Zwei getrennte Trigger, und das ist kein Schönheitsentscheid:
+--   BEFORE INSERT — darf diese Adresse überhaupt?
+--   AFTER  INSERT — Profil anlegen
+-- Beides zusammen in BEFORE INSERT schlägt fehl, weil die Zeile in
+-- auth.users dann noch nicht existiert und der Fremdschlüssel von
+-- profiles.id ins Leere zeigt. Das blockierte zunächst *jede* Anmeldung,
+-- auch die freigeschaltete.
 
 create or replace function public.enforce_allowed_email()
 returns trigger
@@ -199,11 +214,19 @@ begin
   ) then
     raise exception 'Diese E-Mail-Adresse ist für JARVIS nicht freigeschaltet.';
   end if;
+  return new;
+end $$;
 
+create or replace function public.create_profile_for_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
   insert into public.profiles (id, display_name)
   values (new.id, split_part(new.email, '@', 1))
   on conflict (id) do nothing;
-
   return new;
 end $$;
 
@@ -211,3 +234,12 @@ drop trigger if exists enforce_allowed_email on auth.users;
 create trigger enforce_allowed_email
   before insert on auth.users
   for each row execute function public.enforce_allowed_email();
+
+drop trigger if exists create_profile_for_user on auth.users;
+create trigger create_profile_for_user
+  after insert on auth.users
+  for each row execute function public.create_profile_for_user();
+
+-- SECURITY-DEFINER-Funktionen gehören nicht in die öffentliche API.
+revoke all on function public.enforce_allowed_email()   from public, anon, authenticated;
+revoke all on function public.create_profile_for_user() from public, anon, authenticated;

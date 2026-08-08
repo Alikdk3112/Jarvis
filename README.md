@@ -55,25 +55,39 @@ src/lib/data/supabase.ts   dieselbe Schnittstelle gegen Supabase
 src/lib/data/index.ts      wählt anhand der Umgebungsvariablen aus
 ```
 
-**Zurzeit lokal.** Die Daten liegen ausschließlich in dem Browser, in dem du sie erfasst hast.
-Lade unter *Einstellungen → Daten* regelmäßig eine Sicherung herunter — dieselbe Datei ist
-zugleich der Umzugskoffer nach Supabase.
+Ohne `.env.local` läuft alles lokal — praktisch zum Ausprobieren, aber Handy und Laptop
+haben dann getrennte Daten. Lade unter *Einstellungen → Daten* regelmäßig eine Sicherung
+herunter; dieselbe Datei ist zugleich der Umzugskoffer.
 
-### Auf Supabase umstellen
+### Supabase einschalten
 
-1. Supabase-Projekt anlegen
-2. `supabase/migrations/0001_schema.sql` im SQL-Editor ausführen
-   (legt Tabellen, Row Level Security und die Zugangsbeschränkung an)
-3. `.env.local` anlegen:
+Das Schema ist bereits eingespielt (Projekt `PrivateApp`, Region `eu-west-1`).
+Es liegt dort neben einer fremden Tabelle `dashboard_state`, die unberührt bleibt —
+ein eigenes Projekt ging nicht, weil der kostenlose Tarif zwei aktive Projekte erlaubt
+und beide belegt waren.
+
+1. `.env.local` anlegen (Werte stehen im Supabase-Dashboard unter *Project Settings → API*):
    ```
    VITE_SUPABASE_URL=…
    VITE_SUPABASE_ANON_KEY=…
    ```
-4. Neu starten, anmelden, unter *Einstellungen → Daten* die Sicherung einlesen
+2. Neu starten → es erscheint der Anmeldebildschirm. E-Mail eintragen, Link aus der Mail öffnen.
+3. Unter *Einstellungen → Daten* die lokale Sicherung einlesen.
+
+Für ein frisches Projekt stattdessen `supabase/migrations/0001_schema.sql` im SQL-Editor
+ausführen — die Datei ist auf dem eingespielten Stand.
 
 Nur Adressen aus der Tabelle `allowed_emails` können ein Konto anlegen — ein Trigger auf
-`auth.users` bricht sonst ab. Zusammen mit Row Level Security bleibt die App auch unter
-öffentlicher URL dicht; der `anon key` ist dafür ausgelegt, öffentlich zu sein.
+`auth.users` bricht sonst ab. Geprüft: eine fremde Adresse wird abgewiesen, die
+freigeschaltete kommt durch und bekommt ihr Profil. Zusammen mit Row Level Security
+(13 von 13 Tabellen) bleibt die App auch unter öffentlicher URL dicht; der `anon key`
+ist dafür ausgelegt, öffentlich zu sein.
+
+Eine weitere Adresse freischalten:
+
+```sql
+insert into public.allowed_emails (email) values ('…') on conflict do nothing;
+```
 
 ## Veröffentlichen
 
