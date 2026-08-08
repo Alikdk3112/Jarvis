@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from './App'
 import { seedIfEmpty } from './lib/seed'
+import { isLocalMode } from './lib/data'
 
 import './styles/tokens.css'
 import './styles/hud.css'
@@ -15,10 +16,13 @@ const queryClient = new QueryClient({
   },
 })
 
-// Erstbefüllung vor dem ersten Rendern: sonst blitzt ein leeres Cockpit auf.
-seedIfEmpty()
-  .catch((err) => console.error('Erstbefüllung fehlgeschlagen:', err))
-  .finally(() => {
+// Lokal vor dem ersten Rendern befüllen, sonst blitzt ein leeres Cockpit auf.
+// Im Supabase-Modus geht das erst nach der Anmeldung — das erledigt AuthGate.
+const ready = isLocalMode
+  ? seedIfEmpty().catch((err) => console.error('Erstbefüllung fehlgeschlagen:', err))
+  : Promise.resolve()
+
+ready.finally(() => {
     createRoot(document.getElementById('root') as HTMLElement).render(
       <StrictMode>
         <QueryClientProvider client={queryClient}>

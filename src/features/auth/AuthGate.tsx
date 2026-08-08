@@ -13,6 +13,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { hasSupabase, supabase } from '../../lib/supabaseClient'
 import { useRefreshAll } from '../../lib/store'
+import { seedIfEmpty } from '../../lib/seed'
 import { AmbientLayer } from '../../components/AmbientLayer'
 
 function Shell({ children }: { children: ReactNode }) {
@@ -58,8 +59,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next)
-      // Nach dem Anmelden neu laden: vorher lagen leere Ergebnisse im Cache.
-      if (next) refreshAll()
+      if (!next) return
+      // Beim allerersten Login ist das Konto leer — dann einmal befüllen,
+      // damit kein nacktes Gerüst dasteht. Danach immer neu laden, weil
+      // vorher leere Ergebnisse im Cache lagen.
+      void seedIfEmpty()
+        .catch((err) => console.error('Erstbefüllung fehlgeschlagen:', err))
+        .finally(refreshAll)
     })
     return () => sub.subscription.unsubscribe()
   }, [refreshAll])

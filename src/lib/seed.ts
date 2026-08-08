@@ -9,14 +9,21 @@ import { data } from './data'
 import type { Habit, Task, Course, Goal, Workout, JournalEntry, StudySession } from './data/types'
 import { addDays, today, toKey } from './date'
 import { newId } from './id'
-import { isEmpty } from './data/local'
 
 const now = () => new Date().toISOString()
 
+/** Ist noch gar nichts da? Fragt den aktiven Adapter, nicht die Datenbank —
+ *  damit dieselbe Prüfung lokal wie in Supabase funktioniert. */
+async function isEmpty(): Promise<boolean> {
+  const [habits, tasks, courses] = await Promise.all([
+    data.habits.list(),
+    data.tasks.list(),
+    data.courses.list(),
+  ])
+  return habits.length + tasks.length + courses.length === 0
+}
+
 export async function seedIfEmpty(): Promise<void> {
-  // Erstbefüllung gibt es nur im lokalen Modus; in Supabase legt der Nutzer
-  // seine Daten selbst an und ein Seed würde fremde Zeilen erzeugen.
-  if (data.kind !== 'local') return
   if (!(await isEmpty())) return
 
   const t = today()
