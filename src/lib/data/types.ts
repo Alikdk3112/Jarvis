@@ -149,6 +149,10 @@ export interface Repo<T extends { id: ID }> {
    *  Netzanfragen — die Erstbefüllung allein bräuchte so Minuten. */
   putMany(items: T[]): Promise<void>
   remove(id: ID): Promise<void>
+  /** Viele Zeilen auf einmal löschen. Nötig für abhängige Datensätze: Wer
+   *  einen Habit mit einem Jahr Verlauf löscht, würde sonst dreihundert
+   *  einzelne Anfragen auslösen. */
+  removeMany(ids: ID[]): Promise<void>
 }
 
 export interface Backup {

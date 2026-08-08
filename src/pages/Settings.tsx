@@ -44,29 +44,78 @@ function Toggle({
   )
 }
 
+/** Alles zählen, was in einer Sicherung steckt — jede Liste, nicht nur
+ *  einige. Eine Zahl, die die Hälfte unterschlägt, wiegt in einer Rückfrage
+ *  vor dem Überschreiben in falscher Sicherheit. */
+function countRecords(b: Partial<Backup>): number {
+  let n = 0
+  for (const value of Object.values(b)) if (Array.isArray(value)) n += value.length
+  return n
+}
+
 export function Settings() {
   const { settings, save } = useSettings()
   const refreshAll = useRefreshAll()
   const beep = useSound(settings.sound)
   const fileRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<string | null>(null)
+  const [name, setName] = useState(settings.displayName)
 
-  async function doExport() {
-    const backup = await data.exportAll()
+  // Der Name kommt aus einer Abfrage; beim ersten Rendern steht dort noch
+  // der Vorgabewert. Nachziehen, solange das Feld nicht bearbeitet wird.
+  const lastLoaded = useRef(settings.displayName)
+  if (lastLoaded.current !== settings.displayName) {
+    lastLoaded.current = settings.displayName
+    if (name !== settings.displayName) setName(settings.displayName)
+  }
+
+  async function download(backup: Backup, name: string) {
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `jarvis-${backup.exportedAt.slice(0, 10)}.json`
+    a.download = name
+    // In den Baum hängen und wieder heraus: Ohne das ignoriert Firefox den
+    // Klick. Und die Adresse erst später freigeben — Safari bricht den
+    // Download sonst ab, weil er beim Klick noch gar nicht begonnen hat.
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
+
+  async function doExport() {
+    const backup = await data.exportAll()
+    await download(backup, `jarvis-${backup.exportedAt.slice(0, 10)}.json`)
     setStatus('Sicherung heruntergeladen.')
   }
 
+  /* Einlesen ersetzt den gesamten Bestand — jede Tabelle wird geleert und
+     neu gefüllt. Das ist der einzige Knopf in dieser App, der alles auf
+     einmal vernichten kann, und er lag direkt neben dem zum Sichern.
+     Deshalb: erst zeigen, was in der Datei steht, dann fragen, und vorher
+     den aktuellen Stand als Datei herausgeben. */
   async function doImport(file: File) {
     try {
       const parsed = JSON.parse(await file.text()) as Backup
       if (parsed.version !== 1) throw new Error('Unbekannte Dateiversion.')
+
+      const current = await data.exportAll()
+      const incoming = countRecords(parsed)
+      const existing = countRecords(current)
+
+      const ok = window.confirm(
+        'Sicherung einlesen?\n\n' +
+          `Datei vom ${parsed.exportedAt?.slice(0, 10) ?? 'unbekannt'} mit ${incoming} Datensätzen.\n` +
+          `Dein jetziger Stand (${existing} Datensätze) wird dabei vollständig ersetzt.\n\n` +
+          'Zur Sicherheit wird er vorher als Datei heruntergeladen.',
+      )
+      if (!ok) {
+        setStatus('Abgebrochen — nichts verändert.')
+        return
+      }
+
+      await download(current, `jarvis-vor-import-${current.exportedAt.slice(0, 10)}.json`)
       await data.importAll(parsed)
       refreshAll()
       setStatus('Sicherung eingelesen.')
@@ -104,10 +153,21 @@ export function Settings() {
           />
           <div className="row">
             <span className="row__n">Name im Briefing</span>
+            {/* Gespeichert wird beim Verlassen des Feldes, nicht bei jedem
+                Buchstaben: „Alexander" waren vorher neun Schreibvorgänge —
+                mit Supabase neun Anfragen übers Netz für einen Namen. */}
             <input
               className="inp"
-              value={settings.displayName}
-              onChange={(e) => void save({ displayName: e.target.value })}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => {
+                const clean = name.trim()
+                if (clean && clean !== settings.displayName) void save({ displayName: clean })
+                else setName(settings.displayName)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+              }}
               aria-label="Name im Briefing"
               style={{ width: 160 }}
             />

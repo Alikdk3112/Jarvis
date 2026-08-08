@@ -4,12 +4,14 @@ import { useMemo, useState } from 'react'
 import { Page } from '../components/Page'
 import { Empty, GlassTile, Icon, Pill, Sparkline } from '../components/hud'
 import { useCollection } from '../lib/store'
+import { useDeleteWorkout } from '../lib/cascade'
 import { newId } from '../lib/id'
 import { addDays, lastDays, shortDate, today, weekDays, weekdayShort } from '../lib/date'
 
 export function Sport() {
   const workouts = useCollection('workouts')
   const sets = useCollection('workoutSets')
+  const deleteWorkout = useDeleteWorkout()
   const [type, setType] = useState('')
   const [minutes, setMinutes] = useState(45)
   const [date, setDate] = useState(today())
@@ -142,7 +144,7 @@ export function Sport() {
                     type="button"
                     className="btn btn--sm"
                     style={{ padding: '6px 10px' }}
-                    onClick={() => void workouts.remove(w.id)}
+                    onClick={() => void deleteWorkout(w.id)}
                     aria-label={`${w.type} löschen`}
                   >
                     <Icon name="trash" />

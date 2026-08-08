@@ -99,11 +99,28 @@ export function useCollection<K extends CollectionKey>(key: K) {
     onSettled: invalidate,
   })
 
+  const removeMany = useMutation({
+    mutationFn: (ids: ID[]) => repo.removeMany(ids),
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: [key] })
+      const prev = qc.getQueryData<Collections[K][]>([key]) ?? []
+      const gone = new Set(ids)
+      qc.setQueryData<Collections[K][]>([key], prev.filter((x) => !gone.has(x.id)))
+      return { prev }
+    },
+    onError: (err, _ids, ctx) => {
+      if (ctx?.prev) qc.setQueryData([key], ctx.prev)
+      reportError(err)
+    },
+    onSettled: invalidate,
+  })
+
   return {
     items: (query.data ?? EMPTY) as Collections[K][],
     isLoading: query.isLoading,
     put: put.mutateAsync,
     remove: remove.mutateAsync,
+    removeMany: removeMany.mutateAsync,
   }
 }
 

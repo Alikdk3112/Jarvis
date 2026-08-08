@@ -75,6 +75,9 @@ function repo<T extends { id: ID }>(table: Table<T, ID>): Repo<T> {
     async remove(id) {
       await table.delete(id)
     },
+    async removeMany(ids) {
+      if (ids.length) await table.bulkDelete(ids)
+    },
   }
 }
 

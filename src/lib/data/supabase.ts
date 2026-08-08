@@ -87,6 +87,18 @@ function repo<T extends { id: ID }>(table: string, orderBy?: string): Repo<T> {
       const { error } = await requireSupabase().from(table).delete().eq('id', id)
       if (error) throw error
     },
+    async removeMany(ids) {
+      if (!ids.length) return
+      // Wie beim Schreiben in Blöcken: eine `in`-Liste mit tausend Werten
+      // sprengt sonst die Länge der Anfrage.
+      for (let i = 0; i < ids.length; i += 500) {
+        const { error } = await requireSupabase()
+          .from(table)
+          .delete()
+          .in('id', ids.slice(i, i + 500))
+        if (error) throw error
+      }
+    },
   }
 }
 

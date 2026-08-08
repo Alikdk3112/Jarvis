@@ -1,10 +1,11 @@
 /* Habits: Wochenraster zum Abhaken, Serien, Anlegen und Löschen. */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Page } from '../components/Page'
 import { DotRow, Empty, GlassTile, Icon, RoundCheck } from '../components/hud'
 import { useHabitToggle } from '../features/habits/useHabitToggle'
 import { useCockpit } from '../lib/cockpit'
+import { useDeleteHabit } from '../lib/cascade'
 import { useCollection } from '../lib/store'
 import { newId } from '../lib/id'
 import { shortDate, today, weekDays, weekdayShort } from '../lib/date'
@@ -12,6 +13,7 @@ import { shortDate, today, weekDays, weekdayShort } from '../lib/date'
 export function Habits() {
   const c = useCockpit()
   const habits = useCollection('habits')
+  const deleteHabit = useDeleteHabit()
   const { toggle, isDone, entries } = useHabitToggle()
   const [name, setName] = useState('')
   const [target, setTarget] = useState(5)
@@ -34,9 +36,34 @@ export function Habits() {
     setName('')
   }
 
-  const weekCount = (habitId: string) => {
-    const set = new Set(week)
-    return entries.filter((e) => e.habitId === habitId && set.has(e.date)).length
+  /* Einmal zählen statt je Habit die ganze Liste zu durchsuchen — der
+     Wert wird zweimal pro Habit gebraucht, und nach einem Jahr stehen hier
+     über tausend Einträge.
+
+     `e.done` wird ausdrücklich geprüft: Abhaken rückgängig zu machen löscht
+     den Eintrag zwar, aber das ist eine Absprache, die nur in
+     useHabitToggle steht. Eine eingelesene Sicherung aus einer älteren
+     Fassung darf die Wochenquote nicht nach oben treiben. */
+  const weekCount = useMemo(() => {
+    const days = new Set(week)
+    const counts = new Map<string, number>()
+    for (const e of entries) {
+      if (!e.done || !days.has(e.date)) continue
+      counts.set(e.habitId, (counts.get(e.habitId) ?? 0) + 1)
+    }
+    return (habitId: string) => counts.get(habitId) ?? 0
+    // `week` entsteht bei jedem Rendern neu, hat aber denselben Inhalt,
+    // solange sich der Tag nicht ändert — deshalb der Tagesschlüssel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, todayKey])
+
+  async function removeHabit(id: string, habitName: string) {
+    const history = entries.filter((e) => e.habitId === id).length
+    const ok = window.confirm(
+      `„${habitName}" löschen?\n\n` +
+        `${history} abgehakte Tage werden mitgelöscht. Das lässt sich nicht rückgängig machen.`,
+    )
+    if (ok) await deleteHabit(id)
   }
 
   return (
@@ -116,7 +143,7 @@ export function Habits() {
                   <button
                     type="button"
                     className="btn btn--sm"
-                    onClick={() => void habits.remove(h.id)}
+                    onClick={() => void removeHabit(h.id, h.name)}
                     aria-label={`${h.name} löschen`}
                     style={{ padding: '6px 10px' }}
                   >

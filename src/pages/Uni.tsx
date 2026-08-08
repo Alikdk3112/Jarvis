@@ -4,11 +4,13 @@ import { useState } from 'react'
 import { Page } from '../components/Page'
 import { ArcGauge, Empty, GlassTile, Icon, Pill } from '../components/hud'
 import { useCollection } from '../lib/store'
+import { useDeleteCourse } from '../lib/cascade'
 import { newId } from '../lib/id'
 import { daysBetween, shortDate, today } from '../lib/date'
 
 export function Uni() {
   const courses = useCollection('courses')
+  const deleteCourse = useDeleteCourse()
   const [name, setName] = useState('')
   const [ects, setEcts] = useState(5)
   const [examDate, setExamDate] = useState('')
@@ -85,7 +87,7 @@ export function Uni() {
                     type="button"
                     className="btn btn--sm"
                     style={{ padding: '6px 10px' }}
-                    onClick={() => void courses.remove(c.id)}
+                    onClick={() => void deleteCourse(c.id)}
                     aria-label={`${c.name} löschen`}
                   >
                     <Icon name="trash" />
