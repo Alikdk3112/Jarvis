@@ -265,19 +265,26 @@ export function ArcHub({
       gx!.clearRect(0, 0, geo.w, geo.h)
       gx!.lineWidth = 1
 
+      // Jeder Strich einzeln wären rund 660 stroke()-Aufrufe pro Bild.
+      // Stattdessen nach Tiefe in fünf Helligkeitsstufen einsortieren und je
+      // Stufe einen einzigen Pfad zeichnen — gleiche Optik, fünf Aufrufe.
+      const bands = [new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D()]
       for (const set of [latLines, lonLines]) {
         for (const arr of set) {
+          let prev = project(arr[0][0], arr[0][1], arr[0][2])
           for (let i = 1; i < arr.length; i++) {
-            const a = project(...arr[i - 1])
-            const b = project(...arr[i])
-            const t = ((a.z + b.z) / 2 + 1) / 2 // hinten dunkler als vorn
-            gx!.strokeStyle = `rgba(120,205,235,${(0.05 + 0.24 * t).toFixed(3)})`
-            gx!.beginPath()
-            gx!.moveTo(a.x, a.y)
-            gx!.lineTo(b.x, b.y)
-            gx!.stroke()
+            const cur = project(arr[i][0], arr[i][1], arr[i][2])
+            const t = ((prev.z + cur.z) / 2 + 1) / 2 // hinten dunkler als vorn
+            const band = bands[Math.min(4, (t * 5) | 0)]
+            band.moveTo(prev.x, prev.y)
+            band.lineTo(cur.x, cur.y)
+            prev = cur
           }
         }
+      }
+      for (let i = 0; i < 5; i++) {
+        gx!.strokeStyle = `rgba(120,205,235,${(0.05 + 0.24 * ((i + 0.5) / 5)).toFixed(3)})`
+        gx!.stroke(bands[i])
       }
 
       // So viele Knoten leuchten, wie der Tag fortgeschritten ist
@@ -288,15 +295,20 @@ export function ArcHub({
         const on = i < lit
         const pulse = 0.55 + 0.45 * Math.sin(now / 620 + n.ph)
         const depth = 0.5 + 0.5 * p.z
+        const r = (on ? 2.0 : 1.1) + (on ? 1.5 : 0.5) * pulse
+        // Halo statt shadowBlur: derselbe Eindruck, ein Bruchteil der Kosten.
+        gx!.fillStyle = on
+          ? `rgba(0,255,157,${(0.16 * pulse).toFixed(3)})`
+          : `rgba(0,229,255,${(0.08 * pulse).toFixed(3)})`
+        gx!.beginPath()
+        gx!.arc(p.x, p.y, r * 2.6, 0, 6.283)
+        gx!.fill()
         gx!.fillStyle = on
           ? `rgba(0,255,157,${depth.toFixed(3)})`
           : `rgba(120,200,235,${(depth * 0.4).toFixed(3)})`
-        gx!.shadowColor = on ? C_HAB : 'rgba(0,229,255,.5)'
-        gx!.shadowBlur = (on ? 9 : 3) * pulse
         gx!.beginPath()
-        gx!.arc(p.x, p.y, (on ? 2.0 : 1.1) + (on ? 1.5 : 0.5) * pulse, 0, 6.283)
+        gx!.arc(p.x, p.y, r, 0, 6.283)
         gx!.fill()
-        gx!.shadowBlur = 0
       })
 
       // Trabanten — Helligkeit folgt dem jeweiligen Modulwert
@@ -311,13 +323,15 @@ export function ArcHub({
         gx!.stroke()
         const sp = orbit(s, s.a)
         const lvl = 0.45 + 0.55 * shown[s.key]
-        gx!.fillStyle = s.col
-        gx!.shadowColor = s.col
-        gx!.shadowBlur = 11 * lvl
+        const sr = (sp.z > 0 ? 2.5 : 1.4) * lvl + 0.7
+        gx!.fillStyle = s.col + '33'
         gx!.beginPath()
-        gx!.arc(sp.x, sp.y, (sp.z > 0 ? 2.5 : 1.4) * lvl + 0.7, 0, 6.283)
+        gx!.arc(sp.x, sp.y, sr * 2.8, 0, 6.283)
         gx!.fill()
-        gx!.shadowBlur = 0
+        gx!.fillStyle = s.col
+        gx!.beginPath()
+        gx!.arc(sp.x, sp.y, sr, 0, 6.283)
+        gx!.fill()
       }
     }
 
@@ -333,21 +347,23 @@ export function ArcHub({
       wx!.lineTo(W, H / 2)
       wx!.stroke()
 
-      wx!.strokeStyle = 'rgba(0,229,255,.9)'
-      wx!.lineWidth = 1.6
-      wx!.shadowColor = C_ACC
-      wx!.shadowBlur = 7
-      wx!.beginPath()
+      // Kurve einmal berechnen, zweimal zeichnen: breit und blass als
+      // Schimmer, darüber dünn und hell. Ersetzt das teure shadowBlur.
+      const wavePath = new Path2D()
       const amp = 0.12 + shown.day * 0.3
       for (let x = 0; x <= W; x += 2) {
         const t = (x / W) * Math.PI * 5 + ph
         const env = Math.sin((x / W) * Math.PI)
         const y = H / 2 + Math.sin(t) * H * amp * env + Math.sin(t * 2.7 + ph) * H * amp * 0.26 * env
-        if (x) wx!.lineTo(x, y)
-        else wx!.moveTo(x, y)
+        if (x) wavePath.lineTo(x, y)
+        else wavePath.moveTo(x, y)
       }
-      wx!.stroke()
-      wx!.shadowBlur = 0
+      wx!.strokeStyle = 'rgba(0,229,255,.18)'
+      wx!.lineWidth = 5
+      wx!.stroke(wavePath)
+      wx!.strokeStyle = 'rgba(0,229,255,.9)'
+      wx!.lineWidth = 1.6
+      wx!.stroke(wavePath)
     }
 
     function paintArcs() {
@@ -362,6 +378,7 @@ export function ArcHub({
     }
 
     let raf = 0
+    let lastPaint = 0
     function frame(now: number) {
       if (!document.hidden) {
         if (!reduce) for (const s of sats) s.a += s.sp
@@ -372,12 +389,19 @@ export function ArcHub({
         shown.stu += (tgt.stu - shown.stu) * k
         shown.num += (tgt.num - shown.num) * k
         paintArcs()
-        if (!reduce) {
-          rot += 0.0042
-          ph += 0.055
+        // Bögen und Zahl jedes Bild — das sind billige Attributschreibungen.
+        // Die Leinwand nur etwa 30×/s: die Drehung ist zu langsam, als dass
+        // man den Unterschied sähe, halbiert aber die Zeichenlast.
+        if (now - lastPaint >= 32) {
+          const dt = lastPaint ? Math.min(4, (now - lastPaint) / 16.7) : 1
+          lastPaint = now
+          if (!reduce) {
+            rot += 0.0042 * dt
+            ph += 0.055 * dt
+          }
+          drawGlobe(now)
+          drawWave()
         }
-        drawGlobe(now)
-        drawWave()
       }
       raf = requestAnimationFrame(frame)
     }

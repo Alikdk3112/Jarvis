@@ -135,6 +135,27 @@ supabase/migrations/
 
 Alle Diagramme sind eigene SVG- und Canvas-Komponenten — bewusst keine Chart-Library.
 
+## Warum kein `backdrop-filter`
+
+Die Glasoptik kam ursprünglich von `backdrop-filter: blur()` auf jeder Kachel, Pille,
+der Kopfzeile und der Navigation. Gemessen mit vierfach gedrosselter CPU kostete das
+mehr als die Hälfte der Bildrate:
+
+| | fps |
+|---|---|
+| mit `backdrop-filter` | 24,8 |
+| ohne Ambient-Ebene | 34,5 |
+| ohne Globus-Canvas | 27,7 |
+| **ohne `backdrop-filter`** | **59,3** |
+
+Sichtbar war er praktisch nicht — hinter den Kacheln liegt fast schwarzer Grund, da gibt
+es nichts zu verwischen. Die Glasoptik trägt der Verlauf plus der Lichtschimmer an der
+Oberkante. Falls jemand ihn wieder einbauen möchte: erst messen.
+
+Der Globus zeichnet aus demselben Grund gebündelt (fünf Pfade nach Tiefenstufen statt
+660 Einzelstriche), nutzt Halo-Kreise statt `shadowBlur` und malt nur etwa 30×/s —
+die Drehung ist zu langsam, als dass man den Unterschied sähe.
+
 ## Schriften
 
 Jura, DM Mono und Outfit liegen unter `public/fonts/` und stehen unter der

@@ -58,14 +58,16 @@
   --goals: #ff2d95;
   --alert: #ff3b30;        /* ausschließlich Warnung */
 
-  /* Glas: heller Verlauf von oben über halbtransparentem Blauschwarz */
+  /* Glas: heller Verlauf von oben über halbtransparentem Blauschwarz.
+     Bewusst ohne backdrop-filter — gemessen kostete der über die Hälfte
+     der Bildrate, und auf fast schwarzem Grund sieht man ihn ohnehin nicht. */
   --glass: linear-gradient(
       168deg,
       rgba(255, 255, 255, 0.075),
       rgba(255, 255, 255, 0.018) 38%,
       rgba(255, 255, 255, 0.004) 100%
     ),
-    rgba(11, 17, 25, 0.62);
+    rgba(11, 17, 25, 0.74);
   --glass-edge: rgba(255, 255, 255, 0.075);
   --glass-lift: inset 0 1px 0 rgba(255, 255, 255, 0.11), 0 24px 48px -30px rgba(0, 0, 0, 0.95);
   --hairline: rgba(255, 255, 255, 0.045);
