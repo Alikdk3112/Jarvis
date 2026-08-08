@@ -72,6 +72,32 @@
   gap: 17px;
 }
 
+/* Die eigentliche Ansicht. Sie erbt die Anordnung der Hülle, damit das
+   Umschließen nichts am Layout ändert, und blendet sich bei jedem Wechsel
+   kurz ein — sonst sieht ein Wechsel zwischen zwei ähnlich aufgebauten
+   Seiten aus, als wäre nichts passiert. */
+.view {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  animation: viewIn 0.16s ease-out both;
+}
+/* Bewusst nicht von null: Der Inhalt soll sofort lesbar sein, die Bewegung
+   sagt nur „neue Seite". Ein echter Aufblendvorgang würde den Wechsel
+   langsamer wirken lassen, nicht schneller. */
+@keyframes viewIn {
+  from {
+    opacity: 0.45;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ── Icon-Leiste (Desktop) ────────────────────────────────────────── */
 .rail {
   position: sticky;
@@ -89,7 +115,23 @@
   box-shadow: var(--glass-lift);
 }
 .rail a,
-.tabbar a { text-decoration: none; }
+.tabbar a {
+  text-decoration: none;
+  /* Ohne das wartet Safari nach dem Tippen erst auf einen möglichen
+     Doppeltipp, bevor der Klick durchgeht. */
+  touch-action: manipulation;
+}
+/* Der Finger ist noch auf dem Glas, die neue Seite braucht aber ein paar
+   Bilder. Diese Rückmeldung überbrückt genau diese Lücke — sie ist der
+   Unterschied zwischen „lädt gerade" und „hängt". Nötig ist sie, weil der
+   graue Blitz von iOS bewusst abgeschaltet ist (siehe tokens.css). */
+.rail a:active,
+.tabbar a:active {
+  transform: scale(0.93);
+  color: var(--pc, var(--accent));
+  background: color-mix(in srgb, var(--pc, var(--accent)) 16%, transparent);
+  transition: none;
+}
 .rail a {
   display: grid;
   place-items: center;
@@ -380,6 +422,11 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .errbar { animation: none; }
+  /* Die Einblendung entfällt, die Rückmeldung beim Tippen bleibt — sie ist
+     keine Zierde, sondern die einzige Antwort auf die Berührung. */
+  .view { animation: none; }
+  .rail a:active,
+  .tabbar a:active { transform: none; }
 }
 
 /* ── Handy: gestapelt, schwebende Kapsel-Navigation ───────────────── */

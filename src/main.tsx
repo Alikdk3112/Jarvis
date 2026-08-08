@@ -12,7 +12,14 @@ import './styles/app.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { refetchOnWindowFocus: false, retry: 1 },
+    queries: {
+      /* Nachladen, wenn die App wieder in den Vordergrund kommt — das ist
+         der Moment, in dem sich etwas geändert haben kann, etwa weil am Mac
+         abgehakt wurde. Beim Blättern zwischen den Seiten dagegen nicht:
+         dort kostet es nur Rundreisen (siehe staleTime in store.ts). */
+      refetchOnWindowFocus: true,
+      retry: 1,
+    },
   },
 })
 

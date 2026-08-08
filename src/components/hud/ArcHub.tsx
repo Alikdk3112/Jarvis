@@ -64,6 +64,110 @@ interface Sat { a: number; sp: number; tilt: number; rad: number; ph: number; co
 
 const TILT = 0.44
 
+/* ── Einmal je Sitzung, nicht je Besuch ──────────────────────────────
+   Gitter und Knoten des Globus sind bei jedem Aufbau identisch — sie hängen
+   an nichts, was sich ändert. Früher entstanden bei jedem Wechsel zurück
+   aufs Cockpit 15 Linienzüge à 45 Punkten neu; jetzt liegen sie hier. */
+
+const LAT_LINES: Array<Array<[number, number, number]>> = []
+for (let i = -2; i <= 2; i++) {
+  const a = (i * Math.PI) / 7
+  const arr: Array<[number, number, number]> = []
+  for (let j = 0; j <= 44; j++) {
+    const lo = (j / 44) * 6.283
+    arr.push([Math.cos(a) * Math.cos(lo), Math.sin(a), Math.cos(a) * Math.sin(lo)])
+  }
+  LAT_LINES.push(arr)
+}
+
+const LON_LINES: Array<Array<[number, number, number]>> = []
+for (let i = 0; i < 10; i++) {
+  const lo = (i / 10) * 6.283
+  const arr: Array<[number, number, number]> = []
+  for (let j = 0; j <= 44; j++) {
+    const la = -1.5708 + (j / 44) * 3.1416
+    arr.push([Math.cos(la) * Math.cos(lo), Math.sin(la), Math.cos(la) * Math.sin(lo)])
+  }
+  LON_LINES.push(arr)
+}
+
+const NODES: Node[] = (() => {
+  const rnd = makeRandom(12345)
+  return Array.from({ length: 22 }, () => ({
+    la: (rnd() - 0.5) * 2.5,
+    lo: rnd() * 6.283,
+    ph: rnd() * 6.283,
+  }))
+})()
+
+const NS = 'http://www.w3.org/2000/svg'
+
+/* Ringe und Teilstriche sind ebenfalls immer gleich: 75 Elemente mit rund
+   300 Attributen. Einmal bauen, danach nur noch kopieren. */
+let chromeTemplate: SVGGElement | null = null
+
+function hubChrome(): SVGGElement {
+  if (chromeTemplate) return chromeTemplate.cloneNode(true) as SVGGElement
+
+  const g = document.createElementNS(NS, 'g')
+
+  // Zwei gegenläufige Ringe, gezeichnet im SVG statt als gedrehte
+  // <span>-Quadrate — sonst wächst deren Rahmen beim Drehen über den
+  // Bildschirmrand hinaus und die Seite lässt sich seitlich schieben.
+  const ringA = document.createElementNS(NS, 'circle')
+  ringA.setAttribute('class', 'hub__ring hub__ring--a')
+  ringA.setAttribute('cx', String(CX))
+  ringA.setAttribute('cy', String(CY))
+  ringA.setAttribute('r', '194')
+  ringA.setAttribute('fill', 'none')
+  ringA.setAttribute('stroke', 'rgba(0,229,255,.17)')
+  ringA.setAttribute('stroke-dasharray', '4 8')
+  g.appendChild(ringA)
+
+  const ringB = document.createElementNS(NS, 'g')
+  ringB.setAttribute('class', 'hub__ring hub__ring--b')
+  const ringBase = document.createElementNS(NS, 'circle')
+  ringBase.setAttribute('cx', String(CX))
+  ringBase.setAttribute('cy', String(CY))
+  ringBase.setAttribute('r', '166')
+  ringBase.setAttribute('fill', 'none')
+  ringBase.setAttribute('stroke', 'rgba(0,229,255,.06)')
+  ringB.appendChild(ringBase)
+  const ringLit = document.createElementNS(NS, 'circle')
+  ringLit.setAttribute('cx', String(CX))
+  ringLit.setAttribute('cy', String(CY))
+  ringLit.setAttribute('r', '166')
+  ringLit.setAttribute('fill', 'none')
+  ringLit.setAttribute('stroke', 'rgba(0,229,255,.36)')
+  // zwei helle Segmente gegenüber, Umfang 2·π·166 ≈ 1043
+  ringLit.setAttribute('stroke-dasharray', '150 371')
+  ringLit.setAttribute('stroke-linecap', 'round')
+  ringB.appendChild(ringLit)
+  g.appendChild(ringB)
+
+  const ticks = document.createElementNS(NS, 'g')
+  ticks.setAttribute('class', 'hub__ticks')
+  for (let i = 0; i < 72; i++) {
+    const deg = i * 5
+    const long = i % 6 === 0
+    const [ax, ay] = pt(184, deg)
+    const [bx, by] = pt(long ? 174 : 179, deg)
+    const l = document.createElementNS(NS, 'line')
+    l.setAttribute('x1', ax.toFixed(1))
+    l.setAttribute('y1', ay.toFixed(1))
+    l.setAttribute('x2', bx.toFixed(1))
+    l.setAttribute('y2', by.toFixed(1))
+    l.setAttribute('stroke', `rgba(255,255,255,${long ? 0.22 : 0.09})`)
+    l.setAttribute('stroke-width', long ? '1.4' : '1')
+    l.setAttribute('stroke-linecap', 'round')
+    ticks.appendChild(l)
+  }
+  g.appendChild(ticks)
+
+  chromeTemplate = g
+  return g.cloneNode(true) as SVGGElement
+}
+
 export function ArcHub({
   fractions,
   value,
@@ -100,74 +204,19 @@ export function ArcHub({
     if (!gx || !wx) return
 
     /* ── Statisches SVG einmal aufbauen ── */
-    const ns = 'http://www.w3.org/2000/svg'
     svg.replaceChildren()
-
-    if (!small) {
-      // Zwei gegenläufige Ringe, gezeichnet im SVG statt als gedrehte
-      // <span>-Quadrate — sonst wächst deren Rahmen beim Drehen über den
-      // Bildschirmrand hinaus und die Seite lässt sich seitlich schieben.
-      const ringA = document.createElementNS(ns, 'circle')
-      ringA.setAttribute('class', 'hub__ring hub__ring--a')
-      ringA.setAttribute('cx', String(CX))
-      ringA.setAttribute('cy', String(CY))
-      ringA.setAttribute('r', '194')
-      ringA.setAttribute('fill', 'none')
-      ringA.setAttribute('stroke', 'rgba(0,229,255,.17)')
-      ringA.setAttribute('stroke-dasharray', '4 8')
-      svg.appendChild(ringA)
-
-      const ringB = document.createElementNS(ns, 'g')
-      ringB.setAttribute('class', 'hub__ring hub__ring--b')
-      const ringBase = document.createElementNS(ns, 'circle')
-      ringBase.setAttribute('cx', String(CX))
-      ringBase.setAttribute('cy', String(CY))
-      ringBase.setAttribute('r', '166')
-      ringBase.setAttribute('fill', 'none')
-      ringBase.setAttribute('stroke', 'rgba(0,229,255,.06)')
-      ringB.appendChild(ringBase)
-      const ringLit = document.createElementNS(ns, 'circle')
-      ringLit.setAttribute('cx', String(CX))
-      ringLit.setAttribute('cy', String(CY))
-      ringLit.setAttribute('r', '166')
-      ringLit.setAttribute('fill', 'none')
-      ringLit.setAttribute('stroke', 'rgba(0,229,255,.36)')
-      // zwei helle Segmente gegenüber, Umfang 2·π·166 ≈ 1043
-      ringLit.setAttribute('stroke-dasharray', '150 371')
-      ringLit.setAttribute('stroke-linecap', 'round')
-      ringB.appendChild(ringLit)
-      svg.appendChild(ringB)
-
-      const ticks = document.createElementNS(ns, 'g')
-      ticks.setAttribute('class', 'hub__ticks')
-      for (let i = 0; i < 72; i++) {
-        const deg = i * 5
-        const long = i % 6 === 0
-        const [ax, ay] = pt(184, deg)
-        const [bx, by] = pt(long ? 174 : 179, deg)
-        const l = document.createElementNS(ns, 'line')
-        l.setAttribute('x1', ax.toFixed(1))
-        l.setAttribute('y1', ay.toFixed(1))
-        l.setAttribute('x2', bx.toFixed(1))
-        l.setAttribute('y2', by.toFixed(1))
-        l.setAttribute('stroke', `rgba(255,255,255,${long ? 0.22 : 0.09})`)
-        l.setAttribute('stroke-width', long ? '1.4' : '1')
-        l.setAttribute('stroke-linecap', 'round')
-        ticks.appendChild(l)
-      }
-      svg.appendChild(ticks)
-    }
+    if (!small) svg.appendChild(hubChrome())
 
     const valuePaths: SVGPathElement[] = []
     const endCaps: SVGCircleElement[] = []
     for (const t of TRACKS) {
-      const trk = document.createElementNS(ns, 'path')
+      const trk = document.createElementNS(NS, 'path')
       trk.setAttribute('class', 'trk')
       trk.setAttribute('d', arcPath(t.r, 1))
       trk.setAttribute('stroke-width', String(t.w))
       svg.appendChild(trk)
 
-      const val = document.createElementNS(ns, 'path')
+      const val = document.createElementNS(NS, 'path')
       val.setAttribute('class', 'val')
       val.setAttribute('stroke', t.color)
       val.setAttribute('stroke-width', String(t.w))
@@ -175,7 +224,7 @@ export function ArcHub({
       svg.appendChild(val)
       valuePaths.push(val)
 
-      const cap = document.createElementNS(ns, 'circle')
+      const cap = document.createElementNS(NS, 'circle')
       cap.setAttribute('r', String(t.w / 2 + 1.6))
       cap.setAttribute('fill', t.color)
       cap.style.filter = `drop-shadow(0 0 9px ${t.color})`
@@ -183,33 +232,8 @@ export function ArcHub({
       endCaps.push(cap)
     }
 
-    /* ── Globus aufbauen ── */
-    const rnd = makeRandom(12345)
-    const latLines: Array<Array<[number, number, number]>> = []
-    const lonLines: Array<Array<[number, number, number]>> = []
-    for (let i = -2; i <= 2; i++) {
-      const a = (i * Math.PI) / 7
-      const arr: Array<[number, number, number]> = []
-      for (let j = 0; j <= 44; j++) {
-        const lo = (j / 44) * 6.283
-        arr.push([Math.cos(a) * Math.cos(lo), Math.sin(a), Math.cos(a) * Math.sin(lo)])
-      }
-      latLines.push(arr)
-    }
-    for (let i = 0; i < 10; i++) {
-      const lo = (i / 10) * 6.283
-      const arr: Array<[number, number, number]> = []
-      for (let j = 0; j <= 44; j++) {
-        const la = -1.5708 + (j / 44) * 3.1416
-        arr.push([Math.cos(la) * Math.cos(lo), Math.sin(la), Math.cos(la) * Math.sin(lo)])
-      }
-      lonLines.push(arr)
-    }
-    const nodes: Node[] = Array.from({ length: 22 }, () => ({
-      la: (rnd() - 0.5) * 2.5,
-      lo: rnd() * 6.283,
-      ph: rnd() * 6.283,
-    }))
+    /* Die Trabanten wandern beim Laufen (`s.a` wächst), deshalb bekommt jede
+       Instanz eigene — anders als Gitter und Knoten, die sich nie ändern. */
     const sats: Sat[] = [
       { a: 0.4, sp: 0.009, tilt: -0.55, rad: 1.2, ph: 0, col: C_HAB, key: 'hab' },
       { a: 2.1, sp: 0.0068, tilt: 0.62, rad: 1.36, ph: 2.1, col: C_STU, key: 'stu' },
@@ -269,7 +293,7 @@ export function ArcHub({
       // Stattdessen nach Tiefe in fünf Helligkeitsstufen einsortieren und je
       // Stufe einen einzigen Pfad zeichnen — gleiche Optik, fünf Aufrufe.
       const bands = [new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D()]
-      for (const set of [latLines, lonLines]) {
+      for (const set of [LAT_LINES, LON_LINES]) {
         for (const arr of set) {
           let prev = project(arr[0][0], arr[0][1], arr[0][2])
           for (let i = 1; i < arr.length; i++) {
@@ -288,8 +312,8 @@ export function ArcHub({
       }
 
       // So viele Knoten leuchten, wie der Tag fortgeschritten ist
-      const lit = Math.round(shown.day * nodes.length)
-      nodes.forEach((n, i) => {
+      const lit = Math.round(shown.day * NODES.length)
+      NODES.forEach((n, i) => {
         const p = project(Math.cos(n.la) * Math.cos(n.lo), Math.sin(n.la), Math.cos(n.la) * Math.sin(n.lo))
         if (p.z <= 0) return
         const on = i < lit

@@ -2,8 +2,8 @@
    Desktop bekommt die Icon-Leiste links, das Handy die schwebende
    Kapsel-Navigation unten — gleiche Ziele, andere Anordnung. */
 
-import { NavLink, Outlet } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { AmbientLayer } from '../components/AmbientLayer'
 import { ErrorBar } from '../components/ErrorBar'
 import { Icon, type IconName } from '../components/hud'
@@ -46,6 +46,14 @@ function Clock() {
 
 export function CockpitLayout() {
   const { settings } = useSettings()
+  const { pathname } = useLocation()
+
+  /* Beim Wechsel nach oben springen — vor dem Malen, damit es nicht ruckt.
+     Ohne das behält der Browser die alte Scrollposition: Man tippt auf
+     „Habits", landet mitten in der Seite und denkt, es sei nichts passiert. */
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
 
   return (
     <>
@@ -78,7 +86,11 @@ export function CockpitLayout() {
             <Clock />
           </header>
 
-          <Outlet />
+          {/* Der Schlüssel wechselt mit der Adresse — dadurch läuft die
+              Einblendung bei jedem Wechsel neu und der Wechsel wird sichtbar. */}
+          <div className="view" key={pathname}>
+            <Outlet />
+          </div>
         </main>
       </div>
 

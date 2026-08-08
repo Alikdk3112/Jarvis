@@ -46,10 +46,16 @@ export function useCollection<K extends CollectionKey>(key: K) {
   const qc = useQueryClient()
   const repo = data[key] as unknown as Repo<Collections[K]>
 
+  /* Fünf Minuten statt dreißig Sekunden: Geändert wird nur in dieser App,
+     und jede Änderung entwertet ihre Sammlung ohnehin gezielt. Mit dem
+     kurzen Wert stieß jeder Seitenwechsel nach kurzer Pause bis zu sechs
+     vollständige Abfragen an — gemessen — ohne dass sich je etwas
+     unterschied. Frisch wird stattdessen beim Zurückkehren zur App
+     geladen, siehe main.tsx. */
   const query = useQuery({
     queryKey: [key],
     queryFn: () => repo.list(),
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   })
 
   const invalidate = () => qc.invalidateQueries({ queryKey: [key] })
