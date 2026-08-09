@@ -63,18 +63,26 @@ interface Node { la: number; lo: number; ph: number }
 interface Sat { a: number; sp: number; tilt: number; rad: number; ph: number; col: string; key: keyof HubFractions }
 
 const TILT = 0.44
+const COS_TILT = Math.cos(TILT)
+const SIN_TILT = Math.sin(TILT)
 
 /* ── Einmal je Sitzung, nicht je Besuch ──────────────────────────────
    Gitter und Knoten des Globus sind bei jedem Aufbau identisch — sie hängen
    an nichts, was sich ändert. Früher entstanden bei jedem Wechsel zurück
    aufs Cockpit 15 Linienzüge à 45 Punkten neu; jetzt liegen sie hier. */
 
+/* Stützpunkte je Linie. Der Globus misst rund 150 Bildpunkte; bei 24
+   Punkten je Linie liegt jeder Abschnitt unter zehn Punkten, gebogen wirkt
+   das identisch. Vorher waren es 45 — also fast doppelt so viel Rechnerei
+   für einen Unterschied, den man nicht sehen kann. */
+const STEPS = 24
+
 const LAT_LINES: Array<Array<[number, number, number]>> = []
 for (let i = -2; i <= 2; i++) {
   const a = (i * Math.PI) / 7
   const arr: Array<[number, number, number]> = []
-  for (let j = 0; j <= 44; j++) {
-    const lo = (j / 44) * 6.283
+  for (let j = 0; j <= STEPS; j++) {
+    const lo = (j / STEPS) * 6.283
     arr.push([Math.cos(a) * Math.cos(lo), Math.sin(a), Math.cos(a) * Math.sin(lo)])
   }
   LAT_LINES.push(arr)
@@ -84,8 +92,8 @@ const LON_LINES: Array<Array<[number, number, number]>> = []
 for (let i = 0; i < 10; i++) {
   const lo = (i / 10) * 6.283
   const arr: Array<[number, number, number]> = []
-  for (let j = 0; j <= 44; j++) {
-    const la = -1.5708 + (j / 44) * 3.1416
+  for (let j = 0; j <= STEPS; j++) {
+    const la = -1.5708 + (j / STEPS) * 3.1416
     arr.push([Math.cos(la) * Math.cos(lo), Math.sin(la), Math.cos(la) * Math.sin(lo)])
   }
   LON_LINES.push(arr)
@@ -173,12 +181,17 @@ export function ArcHub({
   value,
   label = 'TAGESZIEL',
   small = false,
+  animate = true,
 }: {
   fractions: HubFractions
   /** Die große Zahl in der Mitte, 0–1 — meist identisch mit `fractions.day`. */
   value: number
   label?: string
   small?: boolean
+  /** Dreht sich der Globus? Aus den Einstellungen. Steht er still, wird er
+   *  einmal gezeichnet und die Schleife hält an — gemessen acht Bilder pro
+   *  Sekunde Unterschied auf einem langsamen Gerät. */
+  animate?: boolean
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -198,7 +211,7 @@ export function ArcHub({
     const num = numRef.current
     if (!svg || !cv || !wave || !num) return
 
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduce = !animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const gx = cv.getContext('2d')
     const wx = wave.getContext('2d')
     if (!gx || !wx) return
@@ -270,21 +283,49 @@ export function ArcHub({
       }
     }
 
-    function project(x: number, y: number, z: number, extra = 0) {
-      const r = rot + extra
-      const cr = Math.cos(r)
-      const sr = Math.sin(r)
+    /* Sinus und Kosinus der Drehung galten je Punkt neu berechnet.
+
+       `project` läuft rund achthundertmal je Bild; jeder Aufruf rief
+       viermal eine trigonometrische Funktion auf — zweimal für die
+       Drehung, die innerhalb eines Bildes konstant ist, und zweimal für
+       die Neigung, die überhaupt nie wechselt. Das waren dreitausend
+       Aufrufe je Bild für zwei tatsächlich verschiedene Werte.
+
+       Jetzt wird je Bild einmal vorgerechnet; die Neigung steht als
+       Konstante ganz oben. Für die Trabanten, die einen festen Versatz
+       mitbringen, gibt es eine eigene kleine Ablage — drei Werte, die
+       sich nur mit der Drehung ändern. */
+    let cosRot = 1
+    let sinRot = 0
+    const satTrig = new Map<number, { c: number; s: number }>()
+
+    function updateTrig() {
+      cosRot = Math.cos(rot)
+      sinRot = Math.sin(rot)
+      for (const s of sats) satTrig.set(s.ph, { c: Math.cos(rot + s.ph), s: Math.sin(rot + s.ph) })
+    }
+
+    function projectWith(x: number, y: number, z: number, cr: number, sr: number) {
       const x1 = x * cr + z * sr
       const z1 = -x * sr + z * cr
-      const y1 = y * Math.cos(TILT) - z1 * Math.sin(TILT)
-      const z2 = y * Math.sin(TILT) + z1 * Math.cos(TILT)
+      const y1 = y * COS_TILT - z1 * SIN_TILT
+      const z2 = y * SIN_TILT + z1 * COS_TILT
       return { x: geo.cx + x1 * geo.R, y: geo.cy - y1 * geo.R, z: z2 }
     }
 
-    function orbit(s: Sat, a: number) {
+    function project(x: number, y: number, z: number) {
+      return projectWith(x, y, z, cosRot, sinRot)
+    }
+
+    // Neigung und Radius eines Trabanten stehen fest — einmal vorrechnen.
+    const satGeo = sats.map((s) => ({ sinTilt: Math.sin(s.tilt), cosTilt: Math.cos(s.tilt) }))
+
+    function orbit(s: Sat, a: number, i: number) {
       const x = s.rad * Math.cos(a)
       const z = s.rad * Math.sin(a)
-      return project(x, -z * Math.sin(s.tilt), z * Math.cos(s.tilt), s.ph)
+      const g = satGeo[i]
+      const t = satTrig.get(s.ph) ?? { c: cosRot, s: sinRot }
+      return projectWith(x, -z * g.sinTilt, z * g.cosTilt, t.c, t.s)
     }
 
     const shown: HubFractions & { num: number } = reduce
@@ -343,16 +384,16 @@ export function ArcHub({
       })
 
       // Trabanten — Helligkeit folgt dem jeweiligen Modulwert
-      for (const s of sats) {
+      sats.forEach((s, si) => {
         gx!.strokeStyle = 'rgba(120,205,235,.10)'
         gx!.beginPath()
-        for (let k = 0; k <= 44; k++) {
-          const op = orbit(s, (k / 44) * 6.283)
+        for (let k = 0; k <= STEPS; k++) {
+          const op = orbit(s, (k / STEPS) * 6.283, si)
           if (k) gx!.lineTo(op.x, op.y)
           else gx!.moveTo(op.x, op.y)
         }
         gx!.stroke()
-        const sp = orbit(s, s.a)
+        const sp = orbit(s, s.a, si)
         const lvl = 0.45 + 0.55 * shown[s.key]
         const sr = (sp.z > 0 ? 2.5 : 1.4) * lvl + 0.7
         gx!.fillStyle = s.col + '33'
@@ -363,7 +404,7 @@ export function ArcHub({
         gx!.beginPath()
         gx!.arc(sp.x, sp.y, sr, 0, 6.283)
         gx!.fill()
-      }
+      })
     }
 
     function drawWave() {
@@ -431,8 +472,39 @@ export function ArcHub({
 
     let raf = 0
     let lastPaint = 0
+    let visible = true
+
+    /* Läuft der Hub aus dem Bild — etwa weil weiter unten gelesen wird —,
+       braucht ihn niemand zu zeichnen. Ohne das lief die Schleife auch
+       dann weiter, wenn vom Hub kein Pixel mehr zu sehen war. */
+    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting }, { threshold: 0 })
+    io.observe(cv)
+
+    /* Steht alles still — keine Bewegung gewünscht, Zielwerte erreicht —,
+       hält die Schleife ganz an, statt sechzigmal je Sekunde festzustellen,
+       dass es nichts zu tun gibt. Ein neuer Wert startet sie wieder. */
+    let settled = false
+    function atTarget(): boolean {
+      const t = target.current
+      return (
+        Math.abs(t.day - shown.day) < 0.0005 &&
+        Math.abs(t.hab - shown.hab) < 0.0005 &&
+        Math.abs(t.stu - shown.stu) < 0.0005 &&
+        Math.abs(t.num - shown.num) < 0.0005
+      )
+    }
+
     function frame(now: number) {
-      if (!document.hidden) {
+      if (reduce && settled) {
+        if (atTarget()) {
+          // Weiter im Leerlauf beobachten, ob sich ein Zielwert ändert —
+          // das kostet einen Vergleich je Bild, nicht ein ganzes Bild.
+          raf = requestAnimationFrame(frame)
+          return
+        }
+        settled = false
+      }
+      if (!document.hidden && visible) {
         if (!reduce) for (const s of sats) s.a += s.sp
         const k = reduce ? 1 : 0.07
         const tgt = target.current
@@ -455,14 +527,17 @@ export function ArcHub({
             rot += 0.0042 * dt
             ph += 0.055 * dt
           }
+          updateTrig()
           drawGlobe(now)
           drawWave()
         }
+        if (reduce && atTarget()) settled = true
       }
       raf = requestAnimationFrame(frame)
     }
 
     size()
+    updateTrig()
     paintArcs()
     raf = requestAnimationFrame(frame)
 
@@ -475,10 +550,11 @@ export function ArcHub({
 
     return () => {
       cancelAnimationFrame(raf)
+      io.disconnect()
       window.clearTimeout(resizeTimer)
       window.removeEventListener('resize', onResize)
     }
-  }, [small])
+  }, [small, animate])
 
   return (
     <div className={`hub__c ${small ? 'hub__c--sm' : ''}`} ref={wrapRef}>

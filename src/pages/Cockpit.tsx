@@ -74,6 +74,7 @@ export function Cockpit() {
         <ArcHub
           fractions={{ day: dayFrac, hab: c.fractions.hab, stu: stuFrac }}
           value={dayFrac}
+          animate={settings.ambient}
         />
 
         <div className="hub__side hub__side--r">

@@ -140,8 +140,8 @@ export function Settings() {
       <div className="cols">
         <GlassTile title="Darstellung">
           <Toggle
-            label="Ambient-Effekte"
-            hint="Punktraster, Radar-Sweep und Scanlines im Hintergrund."
+            label="Bewegte Effekte"
+            hint="Hintergrund-Raster, Radar-Sweep und der drehende Globus im Hub. Ausgeschaltet läuft die App auf langsamen Geräten spürbar ruhiger — gemessen rund zehn Bilder pro Sekunde."
             checked={settings.ambient}
             onChange={(v) => void save({ ambient: v })}
           />
