@@ -12,6 +12,7 @@ import { data, isLocalMode } from '../lib/data'
 import type { Backup } from '../lib/data/types'
 import { useSound } from '../hooks/useSound'
 import { SignOutButton } from '../features/auth/AuthGate'
+import { clearSamples, diagEnabled, report, setDiagEnabled } from '../lib/diag'
 
 function Toggle({
   label,
@@ -60,6 +61,8 @@ export function Settings() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [name, setName] = useState(settings.displayName)
+  const [diagOn, setDiagOn] = useState(diagEnabled)
+  const [diagText, setDiagText] = useState(report)
 
   // Der Name kommt aus einer Abfrage; beim ersten Rendern steht dort noch
   // der Vorgabewert. Nachziehen, solange das Feld nicht bearbeitet wird.
@@ -219,6 +222,70 @@ export function Settings() {
           </div>
         </GlassTile>
       </div>
+
+      <GlassTile title="Diagnose" color="sport">
+        <Toggle
+          label="Wechsel aufzeichnen"
+          hint="Misst auf diesem Gerät, wie lange ein Seitenwechsel dauert. Nur einschalten, wenn wir einem Hänger nachgehen."
+          checked={diagOn}
+          onChange={(v) => {
+            setDiagEnabled(v)
+            setDiagOn(v)
+            setDiagText(report())
+          }}
+        />
+        {diagOn && (
+          <>
+            <p style={{ fontSize: 14, color: 'var(--dim)', margin: '12px 0' }}>
+              Tipp dich jetzt ein paar Mal durch die Seiten — auch dorthin, wo
+              es hängt. Danach hierher zurück und auf „Aktualisieren".
+            </p>
+            <pre
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 11,
+                lineHeight: 1.6,
+                color: 'var(--dim)',
+                whiteSpace: 'pre',
+                overflowX: 'auto',
+                maxHeight: 320,
+                margin: 0,
+              }}
+            >
+              {diagText}
+            </pre>
+            <div style={{ display: 'flex', gap: 9, marginTop: 12, flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn--p m-sport" onClick={() => setDiagText(report())}>
+                Aktualisieren
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  const text = report()
+                  setDiagText(text)
+                  void navigator.clipboard
+                    ?.writeText(text)
+                    .then(() => setStatus('Bericht kopiert.'))
+                    .catch(() => setStatus('Kopieren ging nicht — Text von Hand markieren.'))
+                }}
+              >
+                Bericht kopieren
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  clearSamples()
+                  setDiagText(report())
+                }}
+              >
+                Zurücksetzen
+              </button>
+            </div>
+          </>
+        )}
+      </GlassTile>
 
       <GlassTile title="Daten" color="journal">
         <p style={{ fontSize: 14, color: 'var(--dim)', marginBottom: 14 }}>

@@ -182,6 +182,9 @@
   color: var(--dim);
 }
 .hdr__sp { flex: 1; }
+/* Am Schreibtisch sitzt das Zahnrad in der Icon-Leiste — hier wäre es
+   doppelt. Auf dem Handy ist die Leiste weg und dies der einzige Zugang. */
+.hdr__set { display: none; }
 .clock {
   font-family: var(--disp);
   font-weight: 300;
@@ -448,6 +451,24 @@
   .hub__side--l, .hub__side--r { align-items: center; }
   .hdr { padding: 10px 16px; gap: 10px; }
   .clock { font-size: 20px; }
+  .hdr__set {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    margin: -4px -6px -4px 0;
+    border-radius: 50%;
+    color: var(--dim);
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  .hdr__set svg { width: 17px; height: 17px; }
+  .hdr__set:active {
+    transform: scale(0.93);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  .hdr__set[aria-current='page'] { color: var(--accent); }
   .brief { border-radius: 24px; padding: 13px 16px; gap: 13px; }
   .brief__txt { font-size: 14.5px; }
   .cols { grid-template-columns: 1fr; }

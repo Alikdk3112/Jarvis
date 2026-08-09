@@ -8,6 +8,7 @@ import { AmbientLayer } from '../components/AmbientLayer'
 import { ErrorBar } from '../components/ErrorBar'
 import { Icon, type IconName } from '../components/hud'
 import { useSettings } from '../lib/store'
+import { markNavEnd, markNavStart } from '../lib/diag'
 import { longDate, pad2, today } from '../lib/date'
 import type { ModuleColor } from '../lib/data/types'
 
@@ -55,6 +56,14 @@ export function CockpitLayout() {
     window.scrollTo(0, 0)
   }, [pathname])
 
+  /* Nach dem ersten Bild der neuen Seite die Messung abschließen — zwei
+     Bilder warten, weil das erste nur der Zeitpunkt ist, an dem React fertig
+     ist, nicht der, an dem etwas auf dem Schirm steht. */
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => markNavEnd(pathname)))
+    return () => cancelAnimationFrame(id)
+  }, [pathname])
+
   return (
     <>
       <AmbientLayer enabled={settings.ambient} />
@@ -63,7 +72,14 @@ export function CockpitLayout() {
       <div className="shell">
         <nav className="rail" aria-label="Module">
           {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.to === '/'} title={n.label} className={`m-${n.color}`}>
+            <NavLink
+              key={n.to}
+              to={n.to}
+              end={n.to === '/'}
+              title={n.label}
+              className={`m-${n.color}`}
+              onPointerDown={() => markNavStart(n.to)}
+            >
               <Icon name={n.icon} />
               <span className="sr-only">{n.label}</span>
             </NavLink>
@@ -84,6 +100,13 @@ export function CockpitLayout() {
             <span className="hdr__d">{longDate(today())}</span>
             <span className="hdr__sp" />
             <Clock />
+            {/* Auf dem Handy der einzige Weg in die Einstellungen: Die
+                Icon-Leiste ist dort ausgeblendet, und in die Tab-Leiste
+                passt kein sechstes Ziel mehr. Am Schreibtisch überflüssig,
+                deshalb per CSS nur schmal sichtbar. */}
+            <NavLink to="/settings" className="hdr__set" aria-label="Einstellungen">
+              <Icon name="gear" />
+            </NavLink>
           </header>
 
           {/* Der Schlüssel wechselt mit der Adresse — dadurch läuft die
@@ -96,7 +119,13 @@ export function CockpitLayout() {
 
       <nav className="tabbar" aria-label="Module">
         {NAV.filter((n) => n.onTabbar).map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.to === '/'} className={`m-${n.color}`}>
+          <NavLink
+            key={n.to}
+            to={n.to}
+            end={n.to === '/'}
+            className={`m-${n.color}`}
+            onPointerDown={() => markNavStart(n.to)}
+          >
             <Icon name={n.icon} />
             <span>{n.label.toUpperCase()}</span>
           </NavLink>
