@@ -1,6 +1,6 @@
 /* Habits: Wochenraster zum Abhaken, Serien, Anlegen und Löschen. */
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Page } from '../components/Page'
 import { DotRow, Empty, GlassTile, Icon, RoundCheck } from '../components/hud'
 import { useHabitToggle } from '../features/habits/useHabitToggle'
@@ -14,7 +14,7 @@ export function Habits() {
   const c = useCockpit()
   const habits = useCollection('habits')
   const deleteHabit = useDeleteHabit()
-  const { toggle, isDone, entries } = useHabitToggle()
+  const { toggle, isDone, weekCount, entries } = useHabitToggle()
   const [name, setName] = useState('')
   const [target, setTarget] = useState(5)
   const week = weekDays()
@@ -35,27 +35,6 @@ export function Habits() {
     })
     setName('')
   }
-
-  /* Einmal zählen statt je Habit die ganze Liste zu durchsuchen — der
-     Wert wird zweimal pro Habit gebraucht, und nach einem Jahr stehen hier
-     über tausend Einträge.
-
-     `e.done` wird ausdrücklich geprüft: Abhaken rückgängig zu machen löscht
-     den Eintrag zwar, aber das ist eine Absprache, die nur in
-     useHabitToggle steht. Eine eingelesene Sicherung aus einer älteren
-     Fassung darf die Wochenquote nicht nach oben treiben. */
-  const weekCount = useMemo(() => {
-    const days = new Set(week)
-    const counts = new Map<string, number>()
-    for (const e of entries) {
-      if (!e.done || !days.has(e.date)) continue
-      counts.set(e.habitId, (counts.get(e.habitId) ?? 0) + 1)
-    }
-    return (habitId: string) => counts.get(habitId) ?? 0
-    // `week` entsteht bei jedem Rendern neu, hat aber denselben Inhalt,
-    // solange sich der Tag nicht ändert — deshalb der Tagesschlüssel.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, todayKey])
 
   async function removeHabit(id: string, habitName: string) {
     const history = entries.filter((e) => e.habitId === id).length

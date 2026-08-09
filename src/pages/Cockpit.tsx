@@ -10,46 +10,33 @@ import { ArcGauge, DotMap, DotRow, Empty, GlassTile, Pill, RoundCheck, Sparkline
 import { Briefing } from '../features/briefing/Briefing'
 import { useTimer } from '../features/study/TimerContext'
 import { useHabitToggle } from '../features/habits/useHabitToggle'
-import { useCockpit } from '../lib/cockpit'
+import { useCockpit, WEIGHTS } from '../lib/cockpit'
 import { useCollection, useSettings } from '../lib/store'
+import { dueLabel } from '../lib/due'
 import {
-  addDays, clockFromSeconds, daysBetween, humanDuration, shortDate, today, weekDays, weekdayShort,
+  addDays, clockFromSeconds, daysBetween, humanDuration, shortDate, weekdayShort,
 } from '../lib/date'
-import { TAG_COLOR, type Task } from '../lib/data/types'
-
-function weekCount(entries: { habitId: string; date: string }[], habitId: string): number {
-  const week = new Set(weekDays())
-  return entries.filter((e) => e.habitId === habitId && week.has(e.date)).length
-}
-
-function dueLabel(task: Task): { text: string; overdue: boolean } | null {
-  if (!task.dueAt) return null
-  const key = task.dueAt.slice(0, 10)
-  const diff = daysBetween(today(), key)
-  const time = task.dueAt.length > 10 ? task.dueAt.slice(11, 16) : ''
-  if (diff < 0) return { text: `ÜBERFÄLLIG · ${shortDate(key)}`, overdue: true }
-  if (diff === 0) return { text: time ? `HEUTE ${time}` : 'HEUTE', overdue: true }
-  if (diff === 1) return { text: 'MORGEN', overdue: false }
-  if (diff <= 6) return { text: weekdayShort(key), overdue: false }
-  return { text: shortDate(key), overdue: false }
-}
+import { TAG_COLOR } from '../lib/data/types'
 
 export function Cockpit() {
   const nav = useNavigate()
   const c = useCockpit()
   const { settings } = useSettings()
-  const { toggle } = useHabitToggle()
+  // Ein Aufruf, nicht zwei: Jeder legt eine eigene Abfrage samt Mutationen
+  // an und rechnet dieselben Nachschlagetabellen ein zweites Mal aus.
+  const { toggle, weekCount } = useHabitToggle()
   const timer = useTimer()
   const tasks = useCollection('tasks')
   const journal = useCollection('journal')
   const workouts = useCollection('workouts')
   const notes = useCollection('notes')
-  const { entries } = useHabitToggle()
 
   // Laufender Timer zählt sofort mit, auch bevor er gebucht ist
   const liveStudySeconds = c.studySecondsToday + timer.seconds
   const stuFrac = Math.min(1, liveStudySeconds / c.studyGoalSeconds)
-  const dayFrac = 0.4 * c.fractions.hab + 0.3 * c.fractions.tsk + 0.3 * stuFrac
+  // Gewichte aus cockpit.ts statt hier nachgebaut — sonst driften die
+  // Zahl im Hub und der Bogen auseinander, sobald eine davon sich ändert.
+  const dayFrac = WEIGHTS.habits * c.fractions.hab + WEIGHTS.tasks * c.fractions.tsk + WEIGHTS.study * stuFrac
 
   // Nach Fälligkeit sortiert — was heute dran ist, gehört nach oben
   const openTasks = c.tasks
@@ -60,9 +47,18 @@ export function Cockpit() {
   const shownTasks = [...openTasks, ...doneToday]
 
   const latestJournal = [...journal.items].sort((a, b) => b.date.localeCompare(a.date))
-  const recentWorkouts = [...workouts.items].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3)
+  /* Vorher: die drei jüngsten Einheiten, ganz gleich wie alt. Wer zuletzt
+     im März trainiert hat, las im August immer noch „3 / Woche". Jetzt
+     zählt, was in den letzten sieben Tagen tatsächlich stattfand. */
+  const sinceKey = addDays(c.todayKey, -6)
+  const recentWorkouts = workouts.items
+    .filter((w) => w.date >= sinceKey && w.date <= c.todayKey)
+    .sort((a, b) => b.date.localeCompare(a.date))
   const ectsDone = c.courses.filter((x) => x.passed).reduce((s, x) => s + x.ects, 0)
   const ectsTotal = c.courses.reduce((s, x) => s + x.ects, 0)
+  const avgStudy = Math.round(
+    c.studyTrend.reduce((a, b) => a + b, 0) / Math.max(1, c.studyTrend.length),
+  )
 
   return (
     <>
@@ -127,9 +123,9 @@ export function Cockpit() {
                     label={h.name}
                   />
                   <span className="row__n">{h.name}</span>
-                  <DotRow filled={weekCount(entries, h.id)} />
+                  <DotRow filled={weekCount(h.id)} />
                   <span className="row__v">
-                    {weekCount(entries, h.id)}/{h.targetPerWeek}
+                    {weekCount(h.id)}/{h.targetPerWeek}
                   </span>
                 </div>
               ))}
@@ -158,7 +154,7 @@ export function Cockpit() {
               </div>
               <div>
                 <span>Ø / TAG</span>
-                <b>{Math.round(c.studyTrend.reduce((a, b) => a + b, 0) / Math.max(1, c.studyTrend.length))} MIN</b>
+                <b>{avgStudy} MIN</b>
               </div>
               <div>
                 <span>SERIE</span>
@@ -174,7 +170,15 @@ export function Cockpit() {
             >
               {timer.running ? 'Pause' : timer.seconds ? 'Weiter' : 'Start'}
             </button>
-            <button type="button" className="btn" onClick={() => void timer.book()}>
+            {/* Unter einer halben Minute verwirft `book()` die Zeit. In der
+                Study-Ansicht ist der Knopf dafür gesperrt — hier war er es
+                nicht, und ein Tipp löschte den Timer kommentarlos. */}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void timer.book()}
+              disabled={timer.seconds < 30}
+            >
               Buchen
             </button>
           </div>
@@ -304,7 +308,7 @@ export function Cockpit() {
         <Pill flat label="Semester" value={`${ectsDone} / ${ectsTotal} ECTS`} color="study" />
         <Pill flat label="Notizen" value={notes.items.length} color="journal" />
         <Pill flat label="Training" value={`${recentWorkouts.length} × 7 T`} color="sport" />
-        <Pill flat label="Ø Lernen" value={`${Math.round(c.studyTrend.reduce((a, b) => a + b, 0) / Math.max(1, c.studyTrend.length))} min`} color="study" />
+        <Pill flat label="Ø Lernen" value={`${avgStudy} min`} color="study" />
       </div>
 
       {/* ── Band 3 ── */}
@@ -336,7 +340,7 @@ export function Cockpit() {
           )}
         </GlassTile>
 
-        <GlassTile title="Lernminuten · 14 T" color="study" className="f3" meta={`Ø ${Math.round(c.studyTrend.reduce((a, b) => a + b, 0) / Math.max(1, c.studyTrend.length))}`}>
+        <GlassTile title="Lernminuten · 14 T" color="study" className="f3" meta={`Ø ${avgStudy}`}>
           <Sparkline
             values={c.studyTrend}
             color="study"

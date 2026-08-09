@@ -1,7 +1,7 @@
 /* Kurze Töne direkt per WebAudio erzeugt — keine Audiodateien im Repo.
    Standardmäßig aus, umschaltbar in den Einstellungen. */
 
-import { useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 
 export type Cue = 'on' | 'off' | 'start' | 'stop' | 'reset' | 'done' | 'nav'
 
@@ -15,19 +15,34 @@ const CUES: Record<Cue, { freq: number; dur: number; vol?: number }> = {
   nav: { freq: 700, dur: 0.05 },
 }
 
-export function useSound(enabled: boolean) {
-  const ctxRef = useRef<AudioContext | null>(null)
+/* Ein Kontext für die ganze App, nicht einer je Komponente.
 
+   Vorher lag er in einem Ref — und `useSound` steckt in fünf Bausteinen
+   gleichzeitig, vom Timer bis zu jeder Kachel mit Häkchen. Safari erlaubt
+   nur eine Handvoll AudioContexts pro Seite und gibt sie erst frei, wenn
+   sie geschlossen werden; geschlossen wurde hier keiner. Ab dem Limit
+   warfen alle weiteren Anläufe, wurden verschluckt, und der Ton blieb
+   dauerhaft weg. */
+let shared: AudioContext | null = null
+
+function context(): AudioContext | null {
+  if (shared) return shared
+  const Ctor =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  // Erst beim ersten Ton anlegen: vorher blockiert ihn der Browser ohnehin.
+  shared = Ctor ? new Ctor() : null
+  return shared
+}
+
+export function useSound(enabled: boolean) {
   return useCallback(
     (cue: Cue) => {
       if (!enabled) return
       const { freq, dur, vol = 0.05 } = CUES[cue]
       try {
-        // Der Kontext wird erst beim ersten Ton angelegt: vorher würde ihn
-        // der Browser ohnehin als „suspended" blockieren.
-        const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-        ctxRef.current ??= new Ctor()
-        const ac = ctxRef.current
+        const ac = context()
+        if (!ac) return
         if (ac.state === 'suspended') void ac.resume()
 
         const osc = ac.createOscillator()

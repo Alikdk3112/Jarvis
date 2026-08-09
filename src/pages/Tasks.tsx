@@ -6,8 +6,9 @@ import { Page } from '../components/Page'
 import { Empty, GlassTile, Icon, RoundCheck, SelectPills } from '../components/hud'
 import { useCollection } from '../lib/store'
 import { newId } from '../lib/id'
-import { daysBetween, shortDate, today, weekdayShort } from '../lib/date'
-import { TAG_COLOR, type Task, type TaskTag } from '../lib/data/types'
+import { shortDate } from '../lib/date'
+import { dueLabel } from '../lib/due'
+import { TAG_COLOR, type TaskTag } from '../lib/data/types'
 
 const TAGS: Array<{ value: NonNullable<TaskTag> | 'none'; label: string }> = [
   { value: 'none', label: 'OHNE' },
@@ -16,18 +17,6 @@ const TAGS: Array<{ value: NonNullable<TaskTag> | 'none'; label: string }> = [
   { value: 'jarvis', label: 'JARVIS' },
   { value: 'privat', label: 'PRIVAT' },
 ]
-
-function due(task: Task): { text: string; overdue: boolean } | null {
-  if (!task.dueAt) return null
-  const key = task.dueAt.slice(0, 10)
-  const diff = daysBetween(today(), key)
-  const time = task.dueAt.length > 10 ? task.dueAt.slice(11, 16) : ''
-  if (diff < 0) return { text: `ÜBERFÄLLIG · ${shortDate(key)}`, overdue: true }
-  if (diff === 0) return { text: time ? `HEUTE ${time}` : 'HEUTE', overdue: true }
-  if (diff === 1) return { text: 'MORGEN', overdue: false }
-  if (diff <= 6) return { text: weekdayShort(key), overdue: false }
-  return { text: shortDate(key), overdue: false }
-}
 
 export function Tasks() {
   const tasks = useCollection('tasks')
@@ -132,7 +121,7 @@ export function Tasks() {
             <Empty>Nichts offen. Ordentlich.</Empty>
           ) : (
             open.map((t) => {
-              const d = due(t)
+              const d = dueLabel(t)
               return (
                 <div className="tsk" key={t.id}>
                   <RoundCheck

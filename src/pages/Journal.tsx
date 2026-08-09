@@ -18,36 +18,56 @@ export function Journal() {
   )
   const todayEntry = entries.find((e) => e.date === todayKey)
 
-  const [draft, setDraft] = useState(todayEntry?.body ?? '')
+  const [draft, setDraft] = useState('')
   const [saved, setSaved] = useState(false)
-  const loaded = useRef(false)
+  const touched = useRef(false)
 
-  // Vorhandenen Text genau einmal übernehmen, danach gehört das Feld dem Nutzer
-  useEffect(() => {
-    if (!loaded.current && todayEntry) {
-      setDraft(todayEntry.body)
-      loaded.current = true
-    }
-  }, [todayEntry])
+  /* Den gespeicherten Text übernehmen, solange niemand getippt hat.
 
-  // Entprellt speichern — eine Sekunde nach der letzten Eingabe
+     Vorher lief das über ein „genau einmal"-Merkmal. Das ging schief, wenn
+     die Abfrage länger brauchte als der erste Tastendruck: Man öffnet das
+     Journal auf dem Handy, fängt sofort an zu schreiben, die Antwort aus
+     Supabase trifft eine Sekunde später ein — und überschreibt das
+     Getippte. `touched` schließt genau das aus. */
   useEffect(() => {
-    if (draft === (todayEntry?.body ?? '')) return
+    if (!touched.current && todayEntry && todayEntry.body !== draft) setDraft(todayEntry.body)
+  }, [todayEntry, draft])
+
+  /* Entprellt speichern, eine Sekunde nach der letzten Eingabe.
+
+     Die Speicherfunktion liegt in einem Ref, weil `journal` bei jedem
+     Rendern ein neues Objekt ist. Stand es in der Abhängigkeitsliste, wurde
+     der Zeitgeber bei jedem Rendern verworfen und neu gestellt — und nach
+     dem Speichern lief er ein zweites Mal los, weil die frisch geladenen
+     Daten erst eine Rundreise später ankamen. */
+  const saveRef = useRef<(text: string) => void>(() => {})
+  saveRef.current = (text: string) => {
+    const stamp = new Date().toISOString()
+    void journal
+      .put(
+        todayEntry
+          ? { ...todayEntry, body: text, updatedAt: stamp }
+          : { id: newId(), date: todayKey, body: text, createdAt: stamp, updatedAt: stamp },
+      )
+      .then(() => {
+        setSaved(true)
+        window.setTimeout(() => setSaved(false), 1600)
+      })
+  }
+
+  const lastSaved = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!touched.current) return
+    // Nichts schreiben, was schon so dasteht — weder in der Datenbank noch
+    // im letzten abgeschickten Stand.
+    if (draft === (todayEntry?.body ?? '') || draft === lastSaved.current) return
     const id = window.setTimeout(() => {
-      const stamp = new Date().toISOString()
-      void journal
-        .put(
-          todayEntry
-            ? { ...todayEntry, body: draft, updatedAt: stamp }
-            : { id: newId(), date: todayKey, body: draft, createdAt: stamp, updatedAt: stamp },
-        )
-        .then(() => {
-          setSaved(true)
-          window.setTimeout(() => setSaved(false), 1600)
-        })
+      lastSaved.current = draft
+      saveRef.current(draft)
     }, 1000)
     return () => window.clearTimeout(id)
-  }, [draft, todayEntry, journal, todayKey])
+  }, [draft, todayEntry])
 
   return (
     <Page title="JOURNAL">
@@ -62,7 +82,10 @@ export function Journal() {
             style={{ minHeight: 220 }}
             placeholder="Wie war der Tag?"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              touched.current = true
+              setDraft(e.target.value)
+            }}
             aria-label="Journaleintrag für heute"
           />
           <p className="row__v" style={{ marginTop: 10 }}>

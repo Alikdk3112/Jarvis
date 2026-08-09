@@ -203,6 +203,13 @@ export function ArcHub({
     const wx = wave.getContext('2d')
     if (!gx || !wx) return
 
+    /* Zahl und Prozentzeichen einmal aufbauen; danach wird nur noch der
+       Text im linken Knoten ausgetauscht. */
+    const numValue = document.createElement('span')
+    const numSup = document.createElement('sup')
+    numSup.textContent = '%'
+    num.replaceChildren(numValue, numSup)
+
     /* ── Statisches SVG einmal aufbauen ── */
     svg.replaceChildren()
     if (!small) svg.appendChild(hubChrome())
@@ -390,15 +397,36 @@ export function ArcHub({
       wx!.stroke(wavePath)
     }
 
+    /* Nur schreiben, wenn sich das Ergebnis wirklich unterscheidet.
+
+       Der Angleich an den Zielwert nähert sich exponentiell — er kommt nie
+       exakt an. Deshalb wurden hier bisher dauerhaft, sechzigmal je
+       Sekunde, drei Pfade und sechs Attribute neu gesetzt, obwohl das Bild
+       längst stand. Jede Änderung an `d` zwingt WebKit, den daran
+       hängenden Weichzeichner neu zu rastern; auf dem Handy ist das die
+       teuerste Einzelheit im Hub. */
+    const drawn = [-1, -1, -1]
+    let drawnNum = -1
+
     function paintArcs() {
       TRACKS.forEach((t, i) => {
-        const f = shown[t.key]
+        const f = Math.max(0, Math.min(1, shown[t.key]))
+        // Auf ein Tausendstel gerundet — feiner als ein Bildpunkt.
+        const q = Math.round(f * 1000)
+        if (q === drawn[i]) return
+        drawn[i] = q
         valuePaths[i].setAttribute('d', arcPath(t.r, f))
-        const [ex, ey] = pt(t.r, A0 + SWEEP * Math.max(0.0001, Math.min(1, f)))
+        const [ex, ey] = pt(t.r, A0 + SWEEP * Math.max(0.0001, f))
         endCaps[i].setAttribute('cx', ex.toFixed(2))
         endCaps[i].setAttribute('cy', ey.toFixed(2))
       })
-      num!.innerHTML = `${Math.round(shown.num * 100)}<sup>%</sup>`
+      const pct = Math.round(shown.num * 100)
+      if (pct !== drawnNum) {
+        drawnNum = pct
+        // textContent statt innerHTML: Letzteres liest bei jedem Bild einen
+        // HTML-Schnipsel neu ein. Das <sup> steht fest daneben.
+        numValue.textContent = String(pct)
+      }
     }
 
     let raf = 0
@@ -408,10 +436,14 @@ export function ArcHub({
         if (!reduce) for (const s of sats) s.a += s.sp
         const k = reduce ? 1 : 0.07
         const tgt = target.current
-        shown.day += (tgt.day - shown.day) * k
-        shown.hab += (tgt.hab - shown.hab) * k
-        shown.stu += (tgt.stu - shown.stu) * k
-        shown.num += (tgt.num - shown.num) * k
+        // Unter einem Zehntausendstel ist der Rest nicht mehr darstellbar —
+        // dann aufsetzen statt sich ewig weiter anzunähern.
+        const ease = (from: number, to: number) =>
+          Math.abs(to - from) < 0.0001 ? to : from + (to - from) * k
+        shown.day = ease(shown.day, tgt.day)
+        shown.hab = ease(shown.hab, tgt.hab)
+        shown.stu = ease(shown.stu, tgt.stu)
+        shown.num = ease(shown.num, tgt.num)
         paintArcs()
         // Bögen und Zahl jedes Bild — das sind billige Attributschreibungen.
         // Die Leinwand nur etwa 30×/s: die Drehung ist zu langsam, als dass
@@ -454,13 +486,15 @@ export function ArcHub({
       <canvas className="hub__cv" ref={cvRef} aria-hidden="true" />
       <svg viewBox="0 0 400 352" ref={svgRef} aria-hidden="true" />
       <div className="hub__mid">
+        {/* Kein aria-live: Die Zahl gleitet nach und änderte sich dabei
+            sechzigmal je Sekunde — eine Sprachausgabe hätte ununterbrochen
+            gezählt. Den Wert trägt jetzt das Label, einmal und ruhig. */}
         <div
           className="hub__num"
           ref={numRef}
-          role="status"
-          aria-live="polite"
-          aria-label={`${label}: ${Math.round(value * 100)} Prozent`}
+          aria-hidden="true"
         />
+        <span className="sr-only">{`${label}: ${Math.round(value * 100)} Prozent`}</span>
         <div className="hub__lab">{label}</div>
       </div>
       <canvas className="hub__wave" ref={waveRef} aria-hidden="true" />
