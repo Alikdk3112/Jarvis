@@ -11,6 +11,7 @@ import { Uni } from './pages/Uni'
 import { Goals } from './pages/Goals'
 import { Sport } from './pages/Sport'
 import { Settings } from './pages/Settings'
+import { IndexPage } from './pages/IndexPage'
 
 export function App() {
   return (
@@ -30,6 +31,8 @@ export function App() {
             <Route path="/goals" element={<Goals />} />
             <Route path="/sport" element={<Sport />} />
             <Route path="/settings" element={<Settings />} />
+            {/* Am Handy der Zugang zu allen neun Ansichten. */}
+            <Route path="/index" element={<IndexPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

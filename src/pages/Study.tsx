@@ -1,8 +1,16 @@
-/* Study: Vollbild-Timer mit Fachzuordnung, Tages- und Wochensummen,
-   Verlauf der letzten zwei Wochen. */
+/* ══════════════════════════════════════════════════════════════════════
+   Study.
 
-import { Page } from '../components/Page'
-import { ArcGauge, Empty, GlassTile, Icon, SelectPills, Sparkline } from '../components/hud'
+   Wichtigste Information: die laufende Zeit als `01:23:45` — die zweite
+   und letzte t-44 der App. Study ist die einzige Ansicht, die man
+   öffnet, um etwas zu starten, nicht um etwas zu lesen.
+
+   Die Ziffer steht NEBEN dem Ring, nicht darin: acht Zeichen in Mono 44px
+   sind rund 211px, der Ring ist 132px breit. Im Cockpit passt die t-44 in
+   die Mitte, weil dort nur zwei Ziffern plus Prozentzeichen stehen.
+   ══════════════════════════════════════════════════════════════════════ */
+
+import { Bars, Btn, Empty, IconBtn, Kv, Nil, Ring, Row, Sec, Status } from '../components/hud'
 import { useTimer } from '../features/study/TimerContext'
 import { useCockpit } from '../lib/cockpit'
 import { useCollection } from '../lib/store'
@@ -16,10 +24,8 @@ export function Study() {
   const todayKey = today()
 
   const active = courses.items.filter((x) => !x.passed)
-  const options = [
-    { value: 'none', label: 'OHNE FACH' },
-    ...active.map((x) => ({ value: x.id, label: x.name.toUpperCase() })),
-  ]
+  const nameOf = (id: string | null) =>
+    id ? (courses.items.find((x) => x.id === id)?.name ?? 'Unbekannt') : 'Ohne Fach'
 
   const todaySessions = sessions.items
     .filter((s) => s.date === todayKey)
@@ -36,102 +42,132 @@ export function Study() {
     .filter((x) => x.seconds > 0)
     .sort((a, b) => b.seconds - a.seconds)
 
-  const nameOf = (id: string | null) =>
-    id ? (courses.items.find((x) => x.id === id)?.name ?? 'Unbekannt') : 'Ohne Fach'
+  const avg = Math.round(c.studyTrend.reduce((a, b) => a + b, 0) / Math.max(1, c.studyTrend.length))
+  const bookable = timer.seconds >= 30
 
   return (
-    <Page title="STUDY">
-      <div className="cols">
-        <GlassTile title="Timer" color="study" meta={`HEUTE ${Math.round((c.studySecondsToday + timer.seconds) / 60)} MIN`}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-            <ArcGauge
-              value={timer.seconds / timer.targetSeconds}
-              label={clockFromSeconds(timer.seconds)}
-              caption={nameOf(timer.courseId).toUpperCase()}
+    <>
+      {/* ── Der Timer ist eine Zeile, keine Kachel ── */}
+      <Sec title="Study" color="study" metaLabel="Woche" metaValue={humanDuration(c.studySecondsWeek)}>
+        <div className="head2" style={{ alignItems: 'center', padding: '8px 8px 16px' }}>
+          <Ring arcs={[{ value: timer.seconds / timer.targetSeconds, color: 'study' }]} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span className="big big--timer">{clockFromSeconds(timer.seconds)}</span>
+            <Status
+              on={timer.running}
               color="study"
-              size={214}
-              strokeWidth={4.5}
-              ticks
+              label={timer.running ? 'Läuft' : timer.seconds ? 'Pause' : 'Bereit'}
             />
-            <SelectPills
-              options={options}
-              value={timer.courseId ?? 'none'}
-              onChange={(v) => timer.setCourseId(v === 'none' ? null : v)}
-              color="study"
-              ariaLabel="Fach wählen"
-            />
-            <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button
-                type="button"
-                className="btn btn--p m-study"
-                onClick={() => (timer.running ? timer.pause() : timer.start())}
-              >
+          </div>
+          {/* Aktionen, keine Auswahl — deshalb Knöpfe und kein
+              Segment-Umschalter. Ein Umschalter, bei dem nichts gewählt
+              ist, lügt über seine Rolle. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div className="btns">
+              <Btn kind="pri" onClick={() => (timer.running ? timer.pause() : timer.start())}>
                 {timer.running ? 'Pause' : timer.seconds ? 'Weiter' : 'Start'}
-              </button>
-              <button type="button" className="btn" onClick={() => void timer.book()} disabled={timer.seconds < 30}>
-                Stop &amp; Buchen
-              </button>
-              <button type="button" className="btn" onClick={timer.reset}>
+              </Btn>
+              <Btn onClick={() => void timer.book()} disabled={!bookable}>
+                Buchen
+              </Btn>
+              <Btn onClick={timer.reset} disabled={!timer.seconds}>
                 Reset
-              </button>
+              </Btn>
             </div>
+            {!bookable && <span className="lead__l">Buchen ab 0:30</span>}
           </div>
-        </GlassTile>
+        </div>
 
-        <GlassTile title="Heute" color="study" meta={humanDuration(c.studySecondsToday)}>
-          {todaySessions.length === 0 ? (
-            <Empty>Heute noch nichts gebucht.</Empty>
-          ) : (
-            todaySessions.map((s) => (
-              <div className="row" key={s.id}>
-                <span className="row__n">{nameOf(s.courseId)}</span>
-                <span className="row__v">
-                  <b>{Math.round(s.seconds / 60)}</b> MIN
-                </span>
-                <button
-                  type="button"
-                  className="btn btn--sm"
-                  style={{ padding: '6px 10px' }}
-                  onClick={() => void sessions.remove(s.id)}
-                  aria-label="Lerneinheit löschen"
-                >
-                  <Icon name="trash" />
-                </button>
-              </div>
-            ))
-          )}
+        <form className="form" onSubmit={(e) => e.preventDefault()}>
+          <label>
+            <span className="lbl">Fach</span>
+            <select
+              className="inp"
+              value={timer.courseId ?? 'none'}
+              onChange={(e) => timer.setCourseId(e.target.value === 'none' ? null : e.target.value)}
+              aria-label="Fach wählen"
+            >
+              <option value="none">Ohne Fach</option>
+              {active.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </form>
+      </Sec>
 
-          <div className="row__v" style={{ marginTop: 18, marginBottom: 8 }}>
-            DIESE WOCHE · {humanDuration(c.studySecondsWeek)}
-          </div>
-          {perCourse.length === 0 ? (
-            <Empty>Diese Woche noch nichts gelernt.</Empty>
-          ) : (
-            perCourse.map(({ course, seconds }) => (
-              <div className="row" key={course.id}>
-                <span className="row__n">{course.name}</span>
-                <span className="row__v">
-                  <b>{humanDuration(seconds)}</b>
-                </span>
-              </div>
-            ))
-          )}
-        </GlassTile>
+      <div className="g12 blk">
+        <div className="c7">
+          <Sec title="Heute" color="study" metaLabel="Summe" metaValue={humanDuration(c.studySecondsToday)}>
+            {todaySessions.length === 0 ? (
+              <Empty>Nichts gebucht — Timer starten</Empty>
+            ) : (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Fach</th>
+                    <th style={{ width: '9ch' }} data-col="opt">
+                      Beginn
+                    </th>
+                    <th className="num" style={{ width: '9ch' }}>
+                      Dauer
+                    </th>
+                    <th className="act" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {todaySessions.map((s) => (
+                    <tr key={s.id}>
+                      <td>{nameOf(s.courseId)}</td>
+                      <td className="met" data-col="opt">
+                        {s.startedAt.slice(11, 16)}
+                      </td>
+                      <td className="num">
+                        {Math.round(s.seconds / 60)}
+                        <span className="unit">min</span>
+                      </td>
+                      <td className="act">
+                        <IconBtn icon="x" label="Lerneinheit löschen" danger onClick={() => void sessions.remove(s.id)} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Sec>
+
+          <Sec title="Verlauf · 14 Tage" color="study" grouped metaLabel="Ø" metaValue={`${avg} min`}>
+            <Bars
+              values={c.studyTrend}
+              color="study"
+              firstLabel={shortDate(addDays(todayKey, -(c.studyTrend.length - 1)))}
+              lastLabel="Heute"
+            />
+          </Sec>
+        </div>
+
+        <div className="c5">
+          <Sec title="Fächer · Woche" color="study" metaValue={perCourse.length}>
+            {perCourse.length === 0 ? (
+              <Empty>Diese Woche noch nichts gebucht</Empty>
+            ) : (
+              perCourse.map(({ course, seconds }) => (
+                <Row key={course.id}>
+                  <span className="row__n">{course.name}</span>
+                  <span className="row__v">{humanDuration(seconds)}</span>
+                </Row>
+              ))
+            )}
+            <Kv label="Ziel / Tag" value={Math.round(c.studyGoalSeconds / 60)} unit="min" />
+            <Kv
+              label="Heute davon"
+              value={c.studySecondsToday ? `${Math.round((c.studySecondsToday / c.studyGoalSeconds) * 100)} %` : <Nil />}
+            />
+          </Sec>
+        </div>
       </div>
-
-      <GlassTile
-        title="Lernminuten · 14 Tage"
-        color="study"
-        meta={`Ø ${Math.round(c.studyTrend.reduce((a, b) => a + b, 0) / Math.max(1, c.studyTrend.length))} MIN`}
-      >
-        <Sparkline
-          values={c.studyTrend}
-          color="study"
-          firstLabel={shortDate(addDays(c.todayKey, -(c.studyTrend.length - 1)))}
-          lastLabel={shortDate(c.todayKey)}
-          height={150}
-        />
-      </GlassTile>
-    </Page>
+    </>
   )
 }

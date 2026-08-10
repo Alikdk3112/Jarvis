@@ -1,13 +1,22 @@
-/* Journal: genau ein Eintrag pro Tag, chronologisch. Der heutige Eintrag
-   ist immer offen und speichert beim Tippen — kein „Speichern"-Knopf, den
-   man abends vergisst. */
+/* ══════════════════════════════════════════════════════════════════════
+   Journal.
+
+   Wichtigste Information: das Textfeld für heute. Journal ist die einzige
+   Ansicht, deren Zweck ein Eingabefeld ist — man kommt her, um zu
+   schreiben, nicht um zu lesen. Also ist das Feld nicht ein Widget im
+   Layout, sondern das Layout: Zeile 2, volle Lesebreite von 68ch.
+
+   Die Zeitleiste ist Archiv und zeigt nur Datum, Länge und Anriss. Der
+   Entwurf sah dort eine Spalte „Stimmung" vor — die gibt es im
+   Datenmodell nicht, und ein Halbsatz sagt über einen Tag mehr als eine
+   Fünf-Stufen-Skala.
+   ══════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Page } from '../components/Page'
-import { Empty, GlassTile, Icon } from '../components/hud'
+import { Btn, Empty, IconBtn, Nil, Sec, Status } from '../components/hud'
 import { useCollection } from '../lib/store'
 import { newId } from '../lib/id'
-import { longDate, shortDate, today, weekdayLong } from '../lib/date'
+import { shortDate, today, weekdayLong } from '../lib/date'
 
 export function Journal() {
   const journal = useCollection('journal')
@@ -17,32 +26,26 @@ export function Journal() {
     [journal.items],
   )
   const todayEntry = entries.find((e) => e.date === todayKey)
+  const past = entries.filter((e) => e.date !== todayKey)
 
   const [draft, setDraft] = useState('')
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [limit, setLimit] = useState(60)
   const touched = useRef(false)
 
   /* Den gespeicherten Text übernehmen, solange niemand getippt hat.
-
-     Vorher lief das über ein „genau einmal"-Merkmal. Das ging schief, wenn
-     die Abfrage länger brauchte als der erste Tastendruck: Man öffnet das
-     Journal auf dem Handy, fängt sofort an zu schreiben, die Antwort aus
-     Supabase trifft eine Sekunde später ein — und überschreibt das
-     Getippte. `touched` schließt genau das aus. */
+     Ab dem ersten Tastendruck gehört das Feld dem Nutzer — sonst
+     überschreibt eine langsame Antwort das Getippte. */
   useEffect(() => {
     if (!touched.current && todayEntry && todayEntry.body !== draft) setDraft(todayEntry.body)
   }, [todayEntry, draft])
 
-  /* Entprellt speichern, eine Sekunde nach der letzten Eingabe.
-
-     Die Speicherfunktion liegt in einem Ref, weil `journal` bei jedem
-     Rendern ein neues Objekt ist. Stand es in der Abhängigkeitsliste, wurde
-     der Zeitgeber bei jedem Rendern verworfen und neu gestellt — und nach
-     dem Speichern lief er ein zweites Mal los, weil die frisch geladenen
-     Daten erst eine Rundreise später ankamen. */
   const saveRef = useRef<(text: string) => void>(() => {})
   saveRef.current = (text: string) => {
     const stamp = new Date().toISOString()
+    setSaving(true)
     void journal
       .put(
         todayEntry
@@ -50,17 +53,20 @@ export function Journal() {
           : { id: newId(), date: todayKey, body: text, createdAt: stamp, updatedAt: stamp },
       )
       .then(() => {
+        setSaving(false)
         setSaved(true)
         window.setTimeout(() => setSaved(false), 1600)
       })
+      .catch(() => setSaving(false))
   }
 
   const lastSaved = useRef<string | null>(null)
 
+  /* `journal` ist bei jedem Rendern ein neues Objekt — stünde es in der
+     Abhängigkeitsliste, würde der Zeitgeber bei jedem Rendern neu
+     gestellt und nie feuern. Deshalb liegt die Schreibfunktion im Ref. */
   useEffect(() => {
     if (!touched.current) return
-    // Nichts schreiben, was schon so dasteht — weder in der Datenbank noch
-    // im letzten abgeschickten Stand.
     if (draft === (todayEntry?.body ?? '') || draft === lastSaved.current) return
     const id = window.setTimeout(() => {
       lastSaved.current = draft
@@ -69,18 +75,33 @@ export function Journal() {
     return () => window.clearTimeout(id)
   }, [draft, todayEntry])
 
+  const found = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return past
+    return past.filter((e) => e.body.toLowerCase().includes(q))
+  }, [past, search])
+
   return (
-    <Page title="JOURNAL">
-      <div className="cols">
-        <GlassTile
+    <div className="g12">
+      {/* ── Die Schreibfläche nutzt von sieben Spalten nur 68ch. Der leere
+             Rest markiert, dass hier Text steht und keine Daten. ── */}
+      <div className="c7">
+        <Sec
           title={`Heute · ${weekdayLong(todayKey)}`}
           color="journal"
-          meta={saved ? 'GESPEICHERT' : longDate(todayKey)}
+          right={
+            saving ? (
+              <Status on={false} label="Speichert" color="journal" />
+            ) : saved ? (
+              <Status on label="Gespeichert" color="habits" />
+            ) : undefined
+          }
         >
           <textarea
             className="inp"
-            style={{ minHeight: 220 }}
-            placeholder="Wie war der Tag?"
+            style={{ width: '100%', minHeight: 160, maxHeight: 320 }}
+            placeholder={journal.isLoading ? 'LADEN' : 'Wie war der Tag?'}
+            disabled={journal.isLoading}
             value={draft}
             onChange={(e) => {
               touched.current = true
@@ -88,48 +109,74 @@ export function Journal() {
             }}
             aria-label="Journaleintrag für heute"
           />
-          <p className="row__v" style={{ marginTop: 10 }}>
-            SPEICHERT AUTOMATISCH
-          </p>
-        </GlassTile>
-
-        <GlassTile title="Zeitleiste" color="journal" meta={`${entries.length} EINTRÄGE`}>
-          {entries.filter((e) => e.date !== todayKey).length === 0 ? (
-            <Empty>Noch keine früheren Einträge.</Empty>
-          ) : (
-            entries
-              .filter((e) => e.date !== todayKey)
-              .slice(0, 40)
-              .map((e) => (
-                <div className="tsk" key={e.id}>
-                  <div className="tsk__b">
-                    <div
-                      style={{
-                        fontFamily: 'var(--mono)',
-                        fontSize: 9.5,
-                        letterSpacing: '.16em',
-                        color: 'var(--journal)',
-                        marginBottom: 5,
-                      }}
-                    >
-                      {shortDate(e.date)} · {weekdayLong(e.date)}
-                    </div>
-                    <p style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{e.body}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn--sm"
-                    style={{ padding: '6px 10px' }}
-                    onClick={() => void journal.remove(e.id)}
-                    aria-label={`Eintrag vom ${shortDate(e.date)} löschen`}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
-              ))
+          {draft.length >= 500 && (
+            <div className="axis">
+              <span />
+              <span>{draft.length} Zeichen</span>
+            </div>
           )}
-        </GlassTile>
+        </Sec>
       </div>
-    </Page>
+
+      {/* ── Zeitleiste: eine Tabelle zeigt zwanzig Tage auf einmal, wo
+             Karten drei zeigten ── */}
+      <div className="c5">
+        <Sec title="Zeitleiste" color="journal" metaLabel="Einträge" metaValue={entries.length}>
+          <div style={{ marginBottom: 8 }}>
+            <input
+              className="inp"
+              placeholder="Durchsuchen"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Einträge durchsuchen"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          {found.length === 0 ? (
+            <Empty>{search ? `Nichts gefunden für „${search}"` : 'Noch keine früheren Einträge'}</Empty>
+          ) : (
+            <>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th style={{ width: '11ch' }}>Datum</th>
+                    <th className="num" style={{ width: '8ch' }} data-col="opt">
+                      Länge
+                    </th>
+                    <th>Anriss</th>
+                    <th className="act" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {found.slice(0, limit).map((e) => (
+                    <tr key={e.id}>
+                      <td className="met">{shortDate(e.date)}</td>
+                      <td className="num" data-col="opt">
+                        {e.body.length || <Nil />}
+                      </td>
+                      <td>{e.body.split('\n')[0] || <Nil />}</td>
+                      <td className="act">
+                        <IconBtn
+                          icon="x"
+                          label={`Eintrag vom ${shortDate(e.date)} löschen`}
+                          danger
+                          onClick={() => void journal.remove(e.id)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {found.length > limit && (
+                <div className="row">
+                  <Btn onClick={() => setLimit(limit + 60)}>+ {found.length - limit} ältere anzeigen</Btn>
+                </div>
+              )}
+            </>
+          )}
+        </Sec>
+      </div>
+    </div>
   )
 }

@@ -21,17 +21,14 @@ export function ErrorBar() {
 
   if (!message) return null
 
+  /* Eine Zeile im Fluss unter der Kopfzeile statt einer schwebenden
+     Blase: kein Overlay, kein Schatten, keine Bewegung. */
   return (
-    <div
-      role="alert"
-      className="errbar"
-      onClick={clearError}
-      style={{ cursor: 'pointer' }}
-      title="Ausblenden"
-    >
-      <span className="errbar__dot" aria-hidden="true" />
-      <span>{message}</span>
-      <Icon name="x" />
+    <div role="alert" className="errline" style={{ padding: '0 24px' }}>
+      <span style={{ flex: 1 }}>{message}</span>
+      <button type="button" className="ibtn ibtn--x" onClick={clearError} aria-label="Ausblenden">
+        <Icon name="x" />
+      </button>
     </div>
   )
 }

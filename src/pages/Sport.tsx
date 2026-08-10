@@ -1,8 +1,21 @@
-/* Sport: Trainingseinheiten mit Sätzen, Wochenvolumen und Verlauf. */
+/* ══════════════════════════════════════════════════════════════════════
+   Sport.
+
+   Wichtigste Information: die Minuten dieser Woche gegen die Vorwoche.
+   Sport wird nicht pro Einheit bewertet, sondern pro Woche — eine
+   einzelne Einheit ist bedeutungslos, die Frage ist immer „bin ich diese
+   Woche dran geblieben". Die Differenz ist die Information, nicht der
+   Absolutwert.
+
+   Die Satztabelle beantwortet eine andere Frage („was habe ich letztes
+   Mal gehoben") und steht deshalb eingerückt unter ihrer Einheit — ohne
+   Rahmen, damit sie sich als Fortsetzung liest und nicht als Kasten in
+   einer Liste. Die Spalte VOLUMEN (kg × Wdh) ist die eigentliche
+   Kennzahl und existierte vorher gar nicht.
+   ══════════════════════════════════════════════════════════════════════ */
 
 import { useMemo, useState } from 'react'
-import { Page } from '../components/Page'
-import { Empty, GlassTile, Icon, Pill, Sparkline } from '../components/hud'
+import { Bars, Btn, Empty, Icon, IconBtn, Kv, Lead, Nil, Row, Sec } from '../components/hud'
 import { useCollection } from '../lib/store'
 import { useDeleteWorkout } from '../lib/cascade'
 import { newId } from '../lib/id'
@@ -19,16 +32,21 @@ export function Sport() {
   const [exercise, setExercise] = useState('')
   const [reps, setReps] = useState(8)
   const [weight, setWeight] = useState(60)
+  const [limit, setLimit] = useState(40)
+  const todayKey = today()
 
   const sorted = useMemo(
     () => [...workouts.items].sort((a, b) => b.date.localeCompare(a.date)),
     [workouts.items],
   )
-  const week = new Set(weekDays())
-  const thisWeek = sorted.filter((w) => week.has(w.date))
-  const weekMinutes = thisWeek.reduce((s, w) => s + w.minutes, 0)
 
-  const trend = lastDays(14).map((d) =>
+  const week = new Set(weekDays())
+  const weekMinutes = sorted.filter((w) => week.has(w.date)).reduce((s, w) => s + w.minutes, 0)
+  // Vorwoche: dieselben sieben Wochentage, sieben Tage früher.
+  const prevWeek = new Set(weekDays(addDays(todayKey, -7)))
+  const prevMinutes = sorted.filter((w) => prevWeek.has(w.date)).reduce((s, w) => s + w.minutes, 0)
+
+  const trend = lastDays(14, todayKey).map((d) =>
     workouts.items.filter((w) => w.date === d).reduce((s, w) => s + w.minutes, 0),
   )
 
@@ -63,156 +81,215 @@ export function Sport() {
   }
 
   return (
-    <Page title="SPORT">
-      <div className="strip" style={{ justifyContent: 'flex-start' }}>
-        <Pill label="Diese Woche" value={`${thisWeek.length} Einheiten`} color="sport" />
-        <Pill label="Volumen" value={`${weekMinutes} min`} color="sport" />
-        <Pill label="Gesamt" value={workouts.items.length} />
-      </div>
-
-      <div className="cols">
-        <GlassTile title="Neue Einheit" color="sport">
-          <form onSubmit={addWorkout} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input
-              className="inp"
-              placeholder="z. B. Push · Bank, Schulter, Trizeps"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              aria-label="Art des Trainings"
+    <>
+      {/* ── Zahl und Kurve auf einer Blickachse, der Rest der Zeile bleibt
+             leer. Stärkste Asymmetrie der App, und Absicht. ── */}
+      <Sec title="Sport" color="sport" metaLabel="Einheiten" metaValue={sorted.length}>
+        <div className="head2" style={{ alignItems: 'flex-end', padding: '8px 8px 4px' }}>
+          <div style={{ minWidth: 160 }}>
+            <Lead value={weekMinutes} unit="min" label="Diese Woche" />
+            <div className="kv" style={{ border: 0, padding: '8px 0 0' }}>
+              <em>Vorwoche</em>
+              <b>
+                {prevMinutes}
+                <span className="unit">min</span>
+              </b>
+            </div>
+          </div>
+          <div style={{ width: 304, maxWidth: '100%' }}>
+            <Bars
+              values={trend}
+              color="sport"
+              firstLabel={shortDate(addDays(todayKey, -13))}
+              lastLabel="Heute"
             />
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          </div>
+        </div>
+      </Sec>
+
+      <Sec title="Einheiten" color="sport" grouped>
+        {sorted.length === 0 ? (
+          <Empty>Keine Einheiten — unten anlegen</Empty>
+        ) : (
+          <>
+            {sorted.slice(0, limit).map((w) => {
+              const mySets = sets.items
+                .filter((s) => s.workoutId === w.id)
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+              const isOpen = openId === w.id
+              return (
+                <div key={w.id}>
+                  <Row>
+                    <span className="row__m" style={{ width: '9ch' }}>
+                      {weekdayShort(w.date)} {shortDate(w.date)}
+                    </span>
+                    <span className="row__n">{w.type}</span>
+                    <span className="row__v">
+                      {w.minutes}
+                      <span className="unit">min</span>
+                    </span>
+                    <span className="row__v" style={{ width: '4ch' }}>
+                      {mySets.length || <Nil />}
+                    </span>
+                    <span className="row__a">
+                      <IconBtn
+                        icon={isOpen ? 'chevronDown' : 'chevron'}
+                        label={`Sätze von ${w.type} ${isOpen ? 'schließen' : 'öffnen'}`}
+                        onClick={() => setOpenId(isOpen ? null : w.id)}
+                      />
+                    </span>
+                    <span className="row__a">
+                      <IconBtn
+                        icon="x"
+                        label={`${w.type} löschen`}
+                        danger
+                        onClick={() => void deleteWorkout(w.id)}
+                      />
+                    </span>
+                  </Row>
+
+                  {isOpen && (
+                    <div style={{ paddingLeft: 28 }}>
+                      <div className="scrollx">
+                        <table className="tbl">
+                          <thead>
+                            <tr>
+                              <th>Übung</th>
+                              <th className="num" style={{ width: '6ch' }}>
+                                Satz
+                              </th>
+                              <th className="num" style={{ width: '7ch' }}>
+                                Kg
+                              </th>
+                              <th className="num" style={{ width: '6ch' }}>
+                                Wdh
+                              </th>
+                              <th className="num" style={{ width: '9ch' }}>
+                                Volumen
+                              </th>
+                              <th className="act" />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {mySets.map((s, i) => (
+                              <tr key={s.id}>
+                                <td>{s.exercise}</td>
+                                <td className="num">{i + 1}</td>
+                                <td className="num">{s.weight}</td>
+                                <td className="num">{s.reps}</td>
+                                <td className="num">{Math.round(s.weight * s.reps)}</td>
+                                <td className="act">
+                                  <IconBtn
+                                    icon="x"
+                                    label={`${s.exercise} löschen`}
+                                    danger
+                                    onClick={() => void sets.remove(s.id)}
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="form__r" style={{ padding: '8px 0 12px' }}>
+                        <label>
+                          <span className="lbl">Übung</span>
+                          <input
+                            className="inp"
+                            placeholder="z. B. Bankdrücken"
+                            value={exercise}
+                            onChange={(e) => setExercise(e.target.value)}
+                            aria-label="Übung"
+                          />
+                        </label>
+                        <label>
+                          <span className="lbl">Kg</span>
+                          <input
+                            className="inp inp--num"
+                            type="number"
+                            min={0}
+                            inputMode="decimal"
+                            value={weight}
+                            onChange={(e) => setWeight(Math.max(0, Number(e.target.value)))}
+                            aria-label="Gewicht"
+                          />
+                        </label>
+                        <label>
+                          <span className="lbl">Wdh</span>
+                          <input
+                            className="inp inp--num"
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            value={reps}
+                            onChange={(e) => setReps(Math.max(0, Number(e.target.value)))}
+                            aria-label="Wiederholungen"
+                          />
+                        </label>
+                        <Btn onClick={() => void addSet(w.id)} disabled={!exercise.trim()}>
+                          <Icon name="plus" /> Satz
+                        </Btn>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {sorted.length > limit && (
+              <div className="row">
+                <Btn onClick={() => setLimit(limit + 40)}>+ {sorted.length - limit} ältere anzeigen</Btn>
+              </div>
+            )}
+          </>
+        )}
+      </Sec>
+
+      <Sec title="Neue Einheit" color="sport" grouped>
+        <form className="form" onSubmit={addWorkout}>
+          <div className="form__r">
+            <label style={{ flex: '1 1 240px' }}>
+              <span className="lbl">Art</span>
+              <input
+                className="inp"
+                placeholder="z. B. Push · Bank, Schulter, Trizeps"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                aria-label="Art des Trainings"
+                style={{ width: '100%' }}
+              />
+            </label>
+            <label>
+              <span className="lbl">Minuten</span>
+              <input
+                className="inp inp--num"
+                type="number"
+                min={0}
+                max={600}
+                inputMode="numeric"
+                value={minutes}
+                onChange={(e) => setMinutes(Math.max(0, Number(e.target.value)))}
+                aria-label="Dauer in Minuten"
+              />
+            </label>
+            <label>
+              <span className="lbl">Datum</span>
               <input
                 className="inp"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 aria-label="Datum"
-                style={{ width: 168 }}
+                style={{ width: 150 }}
               />
-              <input
-                className="inp"
-                type="number"
-                min={1}
-                value={minutes}
-                onChange={(e) => setMinutes(Math.max(1, Number(e.target.value)))}
-                aria-label="Minuten"
-                style={{ width: 100 }}
-              />
-              <button type="submit" className="btn btn--p m-sport" disabled={!type.trim()}>
-                <Icon name="plus" /> Anlegen
-              </button>
-            </div>
-          </form>
-        </GlassTile>
-
-        <GlassTile title="Volumen · 14 Tage" color="sport" meta={`${weekMinutes} MIN / WOCHE`}>
-          <Sparkline
-            values={trend}
-            color="sport"
-            firstLabel={shortDate(addDays(today(), -13))}
-            lastLabel={shortDate(today())}
-          />
-        </GlassTile>
-      </div>
-
-      <GlassTile title="Einheiten" color="sport" meta={`${sorted.length}`}>
-        {sorted.length === 0 ? (
-          <Empty>Noch keine Einheiten erfasst.</Empty>
-        ) : (
-          sorted.slice(0, 40).map((w) => {
-            const mySets = sets.items
-              .filter((s) => s.workoutId === w.id)
-              .sort((a, b) => a.sortOrder - b.sortOrder)
-            const isOpen = openId === w.id
-            return (
-              <div key={w.id} style={{ borderTop: '1px solid var(--hairline)', paddingTop: 8, marginTop: 8 }}>
-                <div className="row" style={{ borderTop: 0, paddingTop: 0 }}>
-                  <span className="row__v" style={{ width: 34 }}>{weekdayShort(w.date)}</span>
-                  <span className="row__n">{w.type}</span>
-                  <span className="row__v">
-                    <b>{w.minutes}</b> MIN
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn--sm"
-                    onClick={() => setOpenId(isOpen ? null : w.id)}
-                    aria-expanded={isOpen}
-                  >
-                    {mySets.length ? `${mySets.length} Sätze` : 'Sätze'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--sm"
-                    style={{ padding: '6px 10px' }}
-                    onClick={() => void deleteWorkout(w.id)}
-                    aria-label={`${w.type} löschen`}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
-
-                {isOpen && (
-                  <div style={{ paddingLeft: 44, paddingBottom: 8 }}>
-                    {mySets.map((s) => (
-                      <div className="row" key={s.id}>
-                        <span className="row__n">{s.exercise}</span>
-                        <span className="row__v">
-                          {s.reps} × <b>{s.weight}</b> KG
-                        </span>
-                        <button
-                          type="button"
-                          className="btn btn--sm"
-                          style={{ padding: '6px 10px' }}
-                          onClick={() => void sets.remove(s.id)}
-                          aria-label={`${s.exercise} löschen`}
-                        >
-                          <Icon name="trash" />
-                        </button>
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                      <input
-                        className="inp"
-                        placeholder="Übung"
-                        value={exercise}
-                        onChange={(e) => setExercise(e.target.value)}
-                        aria-label="Übung"
-                        style={{ flex: '1 1 160px' }}
-                      />
-                      <input
-                        className="inp"
-                        type="number"
-                        min={1}
-                        value={reps}
-                        onChange={(e) => setReps(Math.max(1, Number(e.target.value)))}
-                        aria-label="Wiederholungen"
-                        style={{ width: 84 }}
-                      />
-                      <input
-                        className="inp"
-                        type="number"
-                        min={0}
-                        value={weight}
-                        onChange={(e) => setWeight(Math.max(0, Number(e.target.value)))}
-                        aria-label="Gewicht in Kilogramm"
-                        style={{ width: 92 }}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn--p m-sport"
-                        onClick={() => void addSet(w.id)}
-                        disabled={!exercise.trim()}
-                      >
-                        Satz
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })
-        )}
-      </GlassTile>
-    </Page>
+            </label>
+            <Btn kind="pri" type="submit" disabled={!type.trim()}>
+              <Icon name="plus" /> Anlegen
+            </Btn>
+          </div>
+        </form>
+        <Kv label="Gesamt erfasst" value={workouts.items.length} unit="Einheiten" />
+      </Sec>
+    </>
   )
 }

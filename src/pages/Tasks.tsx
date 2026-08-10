@@ -1,34 +1,44 @@
-/* Aufgaben und Notizen. Beides landet hier, weil beides „Dinge, die ich
-   festhalten will" sind — Aufgaben mit Fälligkeit, Notizen ohne. */
+/* ══════════════════════════════════════════════════════════════════════
+   Tasks & Notes.
+
+   Wichtigste Information: was heute oder schon vorher fällig war — die
+   obersten Zeilen der offenen Liste. Die Sortierung ist die eigentliche
+   Gestaltung dieser Seite: überfällig, heute, morgen, diese Woche,
+   später, ohne Frist. Wer richtig sortiert, braucht keine Hervorhebung —
+   die Reihenfolge IST die Priorität.
+
+   Zwei Bewohner, die nichts miteinander zu tun haben: Aufgaben haben eine
+   Frist, Notizen nicht. Deshalb 32px Abstand statt einer Panelgruppe.
+   ══════════════════════════════════════════════════════════════════════ */
 
 import { useMemo, useState } from 'react'
-import { Page } from '../components/Page'
-import { Empty, GlassTile, Icon, RoundCheck, SelectPills } from '../components/hud'
+import { Btn, Check, Chip, Empty, Icon, IconBtn, Nil, Row, Sec, Seg } from '../components/hud'
 import { useCollection } from '../lib/store'
 import { newId } from '../lib/id'
-import { shortDate } from '../lib/date'
+import { shortDate, today } from '../lib/date'
 import { dueLabel } from '../lib/due'
 import { TAG_COLOR, type TaskTag } from '../lib/data/types'
 
-const TAGS: Array<{ value: NonNullable<TaskTag> | 'none'; label: string }> = [
-  { value: 'none', label: 'OHNE' },
-  { value: 'uni', label: 'UNI' },
-  { value: 'sport', label: 'SPORT' },
-  { value: 'jarvis', label: 'JARVIS' },
-  { value: 'privat', label: 'PRIVAT' },
+const TAGS = [
+  { value: 'none', label: 'Ohne' },
+  { value: 'uni', label: 'Uni' },
+  { value: 'sport', label: 'Sport' },
+  { value: 'jarvis', label: 'Jarvis' },
+  { value: 'privat', label: 'Privat' },
 ]
 
 export function Tasks() {
   const tasks = useCollection('tasks')
   const notes = useCollection('notes')
+  const todayKey = today()
 
   const [title, setTitle] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const [tag, setTag] = useState<NonNullable<TaskTag> | 'none'>('none')
-
+  const [tag, setTag] = useState('none')
   const [noteTitle, setNoteTitle] = useState('')
   const [noteBody, setNoteBody] = useState('')
   const [search, setSearch] = useState('')
+  const [limit, setLimit] = useState(50)
 
   const open = useMemo(
     () =>
@@ -38,10 +48,12 @@ export function Tasks() {
     [tasks.items],
   )
   const done = useMemo(
-    () => tasks.items.filter((t) => t.done).sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? '')),
+    () =>
+      tasks.items
+        .filter((t) => t.done)
+        .sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? '')),
     [tasks.items],
   )
-
   const foundNotes = useMemo(() => {
     const q = search.trim().toLowerCase()
     const sorted = [...notes.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -58,7 +70,7 @@ export function Tasks() {
       title: clean,
       notes: null,
       dueAt: dueDate ? `${dueDate}T12:00` : null,
-      tag: tag === 'none' ? null : tag,
+      tag: tag === 'none' ? null : (tag as NonNullable<TaskTag>),
       done: false,
       doneAt: null,
       createdAt: new Date().toISOString(),
@@ -85,10 +97,12 @@ export function Tasks() {
   }
 
   return (
-    <Page title="TASKS & NOTES">
-      <div className="cols">
-        <GlassTile title="Offen" meta={`${open.length}`}>
-          <form onSubmit={addTask} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+    <div className="g12">
+      {/* ── Aufgaben: die Anlege-Zeile steht ÜBER der Liste, damit der
+             Leerzustand ein Arbeitszustand ist ── */}
+      <div className="c7">
+        <Sec title="Tasks" color="tasks" metaLabel="Offen" metaValue={open.length}>
+          <form className="form" onSubmit={addTask} style={{ marginBottom: 12 }}>
             <input
               className="inp"
               placeholder="Neue Aufgabe"
@@ -96,98 +110,91 @@ export function Tasks() {
               onChange={(e) => setTitle(e.target.value)}
               aria-label="Titel der Aufgabe"
             />
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <input
-                className="inp"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                aria-label="Fällig am"
-                style={{ width: 168 }}
-              />
-              <SelectPills
-                options={TAGS}
-                value={tag}
-                onChange={setTag}
-                ariaLabel="Bereich"
-              />
-              <button type="submit" className="btn btn--p" disabled={!title.trim()}>
+            <div className="form__r">
+              <label>
+                <span className="lbl">Fällig</span>
+                <input
+                  className="inp"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  aria-label="Fällig am"
+                  style={{ width: 150 }}
+                />
+              </label>
+              <div>
+                <span className="lbl">Bereich</span>
+                <Seg options={TAGS} value={tag} onChange={setTag} ariaLabel="Bereich" />
+              </div>
+              <span style={{ flex: 1 }} />
+              <Btn kind="pri" type="submit" disabled={!title.trim()}>
                 <Icon name="plus" /> Anlegen
-              </button>
+              </Btn>
             </div>
           </form>
 
           {open.length === 0 ? (
-            <Empty>Nichts offen. Ordentlich.</Empty>
+            <Empty>Keine Aufgaben — oben anlegen</Empty>
           ) : (
             open.map((t) => {
-              const d = dueLabel(t)
+              const d = dueLabel(t, todayKey)
               return (
-                <div className="tsk" key={t.id}>
-                  <RoundCheck
+                <Row key={t.id} warn={d?.overdue}>
+                  <Check
                     checked={false}
                     label={t.title}
                     onChange={() => void tasks.put({ ...t, done: true, doneAt: new Date().toISOString() })}
                   />
-                  <div className="tsk__b">
-                    <div className="tsk__t">{t.title}</div>
-                    <div className="tsk__m">
-                      {t.tag && (
-                        <span className="chipx" style={{ color: `var(--${TAG_COLOR[t.tag]})` }}>
-                          {t.tag.toUpperCase()}
-                        </span>
-                      )}
-                      {d && <span className={d.overdue ? 'due' : undefined}>{d.text}</span>}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn--sm"
-                    style={{ padding: '6px 10px' }}
-                    onClick={() => void tasks.remove(t.id)}
-                    aria-label={`${t.title} löschen`}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
+                  <span className="row__n">{t.title}</span>
+                  {t.tag && <Chip color={TAG_COLOR[t.tag]}>{t.tag}</Chip>}
+                  <span className={`row__m ${d?.overdue ? 'row__v--warn' : ''}`}>
+                    {d ? d.text : <Nil />}
+                  </span>
+                  <span className="row__a">
+                    <IconBtn icon="x" label={`${t.title} löschen`} danger onClick={() => void tasks.remove(t.id)} />
+                  </span>
+                </Row>
               )
             })
           )}
+        </Sec>
 
-          {done.length > 0 && (
-            <details style={{ marginTop: 16 }}>
-              <summary className="row__v" style={{ cursor: 'pointer' }}>
-                {done.length} ERLEDIGT
-              </summary>
-              <div style={{ marginTop: 8 }}>
-                {done.slice(0, 20).map((t) => (
-                  <div className="tsk" key={t.id} data-done="1">
-                    <RoundCheck
-                      checked
-                      label={t.title}
-                      onChange={() => void tasks.put({ ...t, done: false, doneAt: null })}
-                    />
-                    <div className="tsk__b">
-                      <div className="tsk__t">{t.title}</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn--sm"
-                      style={{ padding: '6px 10px' }}
-                      onClick={() => void tasks.remove(t.id)}
-                      aria-label={`${t.title} löschen`}
-                    >
-                      <Icon name="trash" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </details>
+        {/* Eigene Sektion statt Ausklapper: ein Ausklapper versteckt
+            Zustand hinter Interaktion, eine Sektion zeigt ihn für 22px. */}
+        <Sec title="Erledigt" color="tasks" grouped metaValue={done.length}>
+          {done.length === 0 ? (
+            <Empty>Noch nichts abgehakt</Empty>
+          ) : (
+            <>
+              {done.slice(0, limit).map((t) => (
+                <Row key={t.id} done>
+                  <Check
+                    checked
+                    label={t.title}
+                    onChange={() => void tasks.put({ ...t, done: false, doneAt: null })}
+                  />
+                  <span className="row__n">{t.title}</span>
+                  {t.tag && <Chip color={TAG_COLOR[t.tag]}>{t.tag}</Chip>}
+                  <span className="row__m">{t.doneAt ? shortDate(t.doneAt.slice(0, 10)) : <Nil />}</span>
+                  <span className="row__a">
+                    <IconBtn icon="x" label={`${t.title} löschen`} danger onClick={() => void tasks.remove(t.id)} />
+                  </span>
+                </Row>
+              ))}
+              {done.length > limit && (
+                <div className="row">
+                  <Btn onClick={() => setLimit(limit + 50)}>+ {done.length - limit} ältere anzeigen</Btn>
+                </div>
+              )}
+            </>
           )}
-        </GlassTile>
+        </Sec>
+      </div>
 
-        <GlassTile title="Notizen" color="journal" meta={`${notes.items.length}`}>
-          <form onSubmit={addNote} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+      {/* ── Notizen: ein Archiv mit Suche ── */}
+      <div className="c5">
+        <Sec title="Notes" color="journal" metaValue={notes.items.length}>
+          <form className="form" onSubmit={addNote} style={{ marginBottom: 12 }}>
             <input
               className="inp"
               placeholder="Titel (optional)"
@@ -197,49 +204,72 @@ export function Tasks() {
             />
             <textarea
               className="inp"
-              placeholder="Schnellnotiz …"
+              placeholder="Notiz …"
               value={noteBody}
               onChange={(e) => setNoteBody(e.target.value)}
               aria-label="Inhalt der Notiz"
             />
-            <button type="submit" className="btn btn--p m-journal" disabled={!noteBody.trim()}>
-              Speichern
-            </button>
+            <div className="form__r">
+              <span style={{ flex: 1 }} />
+              <Btn kind="pri" type="submit" disabled={!noteBody.trim()}>
+                Speichern
+              </Btn>
+            </div>
           </form>
 
-          <input
-            className="inp"
-            placeholder="Notizen durchsuchen …"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Notizen durchsuchen"
-            style={{ marginBottom: 12 }}
-          />
+          <div style={{ marginBottom: 8 }}>
+            <input
+              className="inp"
+              placeholder="Durchsuchen"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Notizen durchsuchen"
+              style={{ width: '100%' }}
+            />
+          </div>
 
           {foundNotes.length === 0 ? (
-            <Empty>{search ? 'Nichts gefunden.' : 'Noch keine Notizen.'}</Empty>
+            <Empty>{search ? `Nichts gefunden für „${search}"` : 'Noch keine Notizen'}</Empty>
           ) : (
-            foundNotes.slice(0, 30).map((n) => (
-              <div className="tsk" key={n.id}>
-                <div className="tsk__b">
-                  <div className="tsk__t" style={{ fontWeight: 700 }}>{n.title}</div>
-                  <p style={{ fontSize: 13.5, color: 'var(--dim)', marginTop: 4, whiteSpace: 'pre-wrap' }}>{n.body}</p>
-                  <div className="tsk__m">{shortDate(n.updatedAt.slice(0, 10))}</div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn--sm"
-                  style={{ padding: '6px 10px' }}
-                  onClick={() => void notes.remove(n.id)}
-                  aria-label={`Notiz ${n.title} löschen`}
-                >
-                  <Icon name="trash" />
-                </button>
+            foundNotes.slice(0, 50).map((n) => (
+              <div
+                className="row"
+                key={n.id}
+                style={{ alignItems: 'flex-start', paddingTop: 5, paddingBottom: 5 }}
+              >
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="row__n" style={{ display: 'block', color: 'var(--ink-900)' }}>
+                    {n.title}
+                  </span>
+                  {/* Zweizeiliger Anriss statt voller Text: zehn Notizen
+                      passen dorthin, wo vorher drei standen. */}
+                  <span
+                    className="row__m"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      whiteSpace: 'normal',
+                    }}
+                  >
+                    {n.body}
+                  </span>
+                </span>
+                <span className="row__m">{shortDate(n.updatedAt.slice(0, 10))}</span>
+                <span className="row__a">
+                  <IconBtn
+                    icon="x"
+                    label={`Notiz ${n.title} löschen`}
+                    danger
+                    onClick={() => void notes.remove(n.id)}
+                  />
+                </span>
               </div>
             ))
           )}
-        </GlassTile>
+        </Sec>
       </div>
-    </Page>
+    </div>
   )
 }

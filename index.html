@@ -5,7 +5,9 @@
     <!-- viewport-fit=cover: Inhalt darf unter Notch und Home-Indikator reichen.
          Den Ausgleich übernimmt env(safe-area-inset-*) im CSS. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#05070A" />
+    <!-- Zwei Themen: die Statusleiste folgt dem gewählten Farbklima. -->
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B0B0C" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F4F1" />
     <meta name="description" content="Persönliches Cockpit — Habits, Aufgaben, Lernen, Ziele, Journal" />
     <title>JARVIS</title>
 

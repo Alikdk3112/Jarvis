@@ -1,66 +1,80 @@
-/* Geometrische Icons aus dem Entwurf — runde Formen, 16×16, currentColor. */
+/* ══════════════════════════════════════════════════════════════════════
+   Ein Satz Strichzeichnungen, genau eine Anzeigegröße: 16×16.
+
+   Konstruktion nach LEDGER: stroke-width 1.5, Kappen stumpf, Ecken
+   spitz, keine Füllfläche, alle Waagrechten und Senkrechten auf halben
+   Pixeln, Diagonalen ausschließlich in 45 Grad.
+
+   Die Vorgänger hatten runde Kappen, Füllungen und Strichstärken von 1,2
+   bis 1,7 — bei 16px ergibt das einen weichen, uneinheitlichen Eindruck,
+   der zu einer Konsumenten-App gehört, nicht zu einem Messgerät.
+
+   Wo ein Zeichen nicht in 45 Grad und auf halbe Pixel zu bringen war,
+   steht ein anderes Motiv: „Sport" ist eine Hantel statt einer
+   Pulslinie (eine Pulslinie braucht ungleiche Steigungen), „System" sind
+   Schieberegler statt eines Zahnrads (ein Zahnrad braucht viele Winkel).
+   Beide sagen dasselbe und passen besser zum Rest.
+   ══════════════════════════════════════════════════════════════════════ */
 
 export type IconName =
-  | 'grid' | 'check' | 'list' | 'clock' | 'book'
-  | 'target' | 'pulse' | 'pen' | 'gear' | 'plus' | 'trash' | 'x'
+  | 'cockpit' | 'habits' | 'tasks' | 'journal' | 'study'
+  | 'uni' | 'goals' | 'sport' | 'settings'
+  | 'check' | 'plus' | 'minus' | 'chevron' | 'chevronLeft' | 'chevronDown'
+  | 'search' | 'x'
 
-const PATHS: Record<IconName, React.ReactNode> = {
-  grid: (
-    <>
-      <circle cx="5" cy="5" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="11" cy="5" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="5" cy="11" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="11" cy="11" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
-    </>
-  ),
-  check: (
-    <path d="M3.2 8.4l3.4 3.4L12.9 4.6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-  ),
-  list: (
-    <path d="M2.6 4.5h10.8M2.6 8h10.8M2.6 11.5h7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-  ),
-  clock: (
-    <>
-      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M8 4.6V8l2.4 1.7" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </>
-  ),
-  book: (
-    <path d="M8 4.4C7 3.3 5.4 3 2.9 3v9.3c2.5 0 4.1.3 5.1 1.4 1-1.1 2.6-1.4 5.1-1.4V3c-2.5 0-4.1.3-5.1 1.4zM8 4.4v9.3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-  ),
-  target: (
-    <>
-      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="8" cy="8" r="2.3" fill="currentColor" />
-    </>
-  ),
-  pulse: (
-    <path d="M1.6 8h2.8l1.9-4 2.6 8 2-4h3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-  ),
-  pen: (
-    <path d="M10.9 2.5l2.6 2.6L5.3 13H2.7v-2.6z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-  ),
-  gear: (
-    <>
-      <circle cx="8" cy="8" r="2.4" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M8 1.7v2.2M8 12.1v2.2M14.3 8h-2.2M3.9 8H1.7M12.5 3.5l-1.6 1.6M5.1 10.9l-1.6 1.6M12.5 12.5l-1.6-1.6M5.1 5.1L3.5 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </>
-  ),
-  plus: (
-    <path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-  ),
-  trash: (
-    <path d="M3.4 4.6h9.2M6.4 4.6V3.2h3.2v1.4M4.7 4.6l.6 8.2h5.4l.6-8.2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-  ),
-  x: (
-    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-  ),
+const D: Record<IconName, string> = {
+  // Vier Felder — das Cockpit als Übersicht
+  cockpit: 'M2.5 2.5H7.5V7.5H2.5ZM8.5 2.5H13.5V7.5H8.5ZM2.5 8.5H7.5V13.5H2.5ZM8.5 8.5H13.5V13.5H8.5Z',
+  // Haken — das einzige Zeichen mit zwei Diagonalen
+  habits: 'M3.5 8.5L6.5 11.5L12.5 5.5',
+  // Drei Zeilen, die letzte kürzer
+  tasks: 'M2.5 4.5H13.5M2.5 8.5H13.5M2.5 12.5H9.5',
+  // Federkiel, alle Kanten in 45 Grad
+  journal: 'M10.5 2.5L13.5 5.5L5.5 13.5H2.5V10.5Z',
+  // Uhr: Ring plus Zeiger auf 12 und 3
+  study: 'M8.5 3.5V8.5H12.5',
+  // Aufgeschlagenes Buch: Rahmen mit Mittelfalz
+  uni: 'M2.5 3.5H13.5V12.5H2.5ZM8 3.5V12.5',
+  // Fadenkreuz mit innerem Feld
+  goals: 'M8.5 2.5V5.5M8.5 11.5V13.5M2.5 8.5H5.5M11.5 8.5H13.5M5.5 5.5H11.5V11.5H5.5Z',
+  // Hantel
+  sport: 'M2.5 5.5V10.5M4.5 3.5V12.5M4.5 8H11.5M11.5 3.5V12.5M13.5 5.5V10.5',
+  // Schieberegler
+  settings: 'M2.5 4.5H13.5M2.5 8.5H13.5M2.5 12.5H13.5M5.5 2.5V6.5M10.5 6.5V10.5M6.5 10.5V14.5',
+
+  check: 'M3.5 8.5L6.5 11.5L12.5 5.5',
+  plus: 'M8.5 3.5V13.5M3.5 8.5H13.5',
+  minus: 'M3.5 8.5H13.5',
+  chevron: 'M6.5 3.5L11.5 8.5L6.5 13.5',
+  chevronLeft: 'M9.5 3.5L4.5 8.5L9.5 13.5',
+  chevronDown: 'M3.5 6.5L8.5 11.5L13.5 6.5',
+  search: 'M10.5 10.5L13.5 13.5',
+  x: 'M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5',
+}
+
+/** Zeichen, die zusätzlich einen Kreis brauchen. Ein Kreis hat keine
+ *  Diagonale und ist damit unkritisch. */
+const CIRCLE: Partial<Record<IconName, { cx: number; cy: number; r: number }>> = {
+  study: { cx: 8.5, cy: 8.5, r: 5 },
+  search: { cx: 7, cy: 7, r: 4.5 },
 }
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {
+  const c = CIRCLE[name]
   return (
-    <svg viewBox="0 0 16 16" className={className} aria-hidden="true" focusable="false">
-      {PATHS[name]}
+    <svg
+      viewBox="0 0 16 16"
+      className={className}
+      aria-hidden="true"
+      focusable="false"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="butt"
+      strokeLinejoin="miter"
+    >
+      {c && <circle cx={c.cx} cy={c.cy} r={c.r} />}
+      <path d={D[name]} />
     </svg>
   )
 }

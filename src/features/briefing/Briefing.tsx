@@ -84,13 +84,12 @@ export function buildBriefing(c: CockpitData, name: string, now = new Date()): P
 
 export function Briefing({ cockpit, name }: { cockpit: CockpitData; name: string }) {
   const parts = buildBriefing(cockpit, name)
+  /* Kein Orb, keine Fläche, kein Rahmen: ein Satz Fließtext, in dem die
+     Kennzahlen ihre Modulfarbe tragen. Das ist die einzige
+     Fließtextfläche des Cockpits. */
   return (
-    <div className="brief">
-      <span className="brief__orb" aria-hidden="true">
-        <i />
-        <u />
-      </span>
-      <p className="brief__txt">
+    <>
+      <p className="brief">
         {parts.map((p, i): ReactNode =>
           p.tone ? (
             <b key={i} className={p.tone}>
@@ -101,6 +100,6 @@ export function Briefing({ cockpit, name }: { cockpit: CockpitData; name: string
           ),
         )}
       </p>
-    </div>
+    </>
   )
 }

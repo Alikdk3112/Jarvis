@@ -12,7 +12,10 @@ export type DateKey = string
 /** ISO-8601-Zeitstempel. */
 export type Timestamp = string
 
-export type ModuleColor = 'accent' | 'habits' | 'study' | 'journal' | 'sport' | 'goals'
+/* Die sechs Modultöne von LEDGER. „tasks" ist kein Ton, sondern die
+   Abwesenheit eines Tons: Tasks steht für kein Lebensgebiet und läuft
+   deshalb in Tinte. Das ist eine Aussage, kein Versehen. */
+export type ModuleColor = 'tasks' | 'habits' | 'study' | 'journal' | 'sport' | 'goals'
 
 export interface Habit {
   id: ID
@@ -38,7 +41,7 @@ export type TaskTag = 'uni' | 'sport' | 'jarvis' | 'privat' | null
 export const TAG_COLOR: Record<NonNullable<TaskTag>, ModuleColor> = {
   uni: 'study',
   sport: 'sport',
-  jarvis: 'accent',
+  jarvis: 'tasks',
   privat: 'journal',
 }
 
@@ -123,7 +126,13 @@ export interface WorkoutSet {
   sortOrder: number
 }
 
+export type Theme = 'dark' | 'light' | 'system'
+
 export interface Settings {
+  /** Welches Farbklima. „system" folgt der Einstellung des Geräts. */
+  theme: Theme
+  /* Bewegte Effekte. Bei LEDGER bleibt davon nur die Zahlenannäherung
+     im Ring — Radar-Sweep, Globus und Punktraster gibt es nicht mehr. */
   ambient: boolean
   sound: boolean
   /** Tagesziel Lernzeit in Minuten — speist den violetten Bogen im Hub. */
@@ -134,6 +143,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  theme: 'system',
   ambient: true,
   sound: false,
   studyGoalMinutes: 90,

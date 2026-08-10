@@ -1,57 +1,52 @@
-/* Einstellungen: Effekte, Ton, Ziele — und Export/Import.
+/* ══════════════════════════════════════════════════════════════════════
+   Einstellungen.
 
-   Der Export ist wichtiger, als er aussieht: solange die Daten nur lokal im
-   Browser liegen, ist die JSON-Datei die einzige Sicherung. Beim späteren
-   Umzug auf Supabase wird genau diese Datei wieder eingelesen. */
+   Wichtigste Information: der Zustand der Datenhaltung — wo die Daten
+   liegen, wie viele es sind, wann zuletzt gesichert wurde. Nicht der
+   Ton-Schalter. Deshalb steht die Datenübersicht oben.
 
-import { useRef, useState } from 'react'
-import { Page } from '../components/Page'
-import { GlassTile, Pill } from '../components/hud'
+   Diese Ansicht hat bewusst keine Leitzahl: nichts hier verdient die
+   größte Zahl der Seite. Und jeder Schalter ist ein Zwei-Segment-
+   Umschalter AN | AUS — es gibt keinen Kippschalter, weil ein
+   Kippschalter eine Pille mit rundem Griff ist.
+   ══════════════════════════════════════════════════════════════════════ */
+
+import { useMemo, useRef, useState } from 'react'
+import { Btn, Empty, Kv, Nil, Row, Sec, Seg, Toggle } from '../components/hud'
 import { useRefreshAll, useSettings } from '../lib/store'
 import { data, isLocalMode } from '../lib/data'
-import type { Backup } from '../lib/data/types'
+import type { Backup, Theme } from '../lib/data/types'
 import { useSound } from '../hooks/useSound'
 import { SignOutButton } from '../features/auth/AuthGate'
 import { clearSamples, diagEnabled, report, setDiagEnabled } from '../lib/diag'
+import { shortDate } from '../lib/date'
 
-function Toggle({
-  label,
-  hint,
-  checked,
-  onChange,
-}: {
-  label: string
-  hint: string
-  checked: boolean
-  onChange: (next: boolean) => void
-}) {
-  return (
-    <div className="row">
-      <span className="row__n">
-        {label}
-        <span style={{ display: 'block', fontSize: 12.5, color: 'var(--dim)', whiteSpace: 'normal' }}>{hint}</span>
-      </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        className={`btn ${checked ? 'btn--p' : ''}`}
-        onClick={() => onChange(!checked)}
-      >
-        {checked ? 'An' : 'Aus'}
-      </button>
-    </div>
-  )
-}
-
-/** Alles zählen, was in einer Sicherung steckt — jede Liste, nicht nur
- *  einige. Eine Zahl, die die Hälfte unterschlägt, wiegt in einer Rückfrage
- *  vor dem Überschreiben in falscher Sicherheit. */
+/** Alles zählen, was in einer Sicherung steckt — eine Zahl, die die
+ *  Hälfte unterschlägt, wiegt vor dem Überschreiben in falscher
+ *  Sicherheit. */
 function countRecords(b: Partial<Backup>): number {
   let n = 0
   for (const value of Object.values(b)) if (Array.isArray(value)) n += value.length
   return n
+}
+
+const THEMES = [
+  { value: 'dark', label: 'Dunkel' },
+  { value: 'light', label: 'Hell' },
+  { value: 'system', label: 'System' },
+]
+
+const LABELS: Record<string, string> = {
+  habits: 'Habits',
+  habitEntries: 'Habit-Einträge',
+  tasks: 'Aufgaben',
+  notes: 'Notizen',
+  journal: 'Journal',
+  courses: 'Kurse',
+  studySessions: 'Lernzeiten',
+  goals: 'Ziele',
+  workouts: 'Training',
+  workoutSets: 'Sätze',
 }
 
 export function Settings() {
@@ -63,24 +58,44 @@ export function Settings() {
   const [name, setName] = useState(settings.displayName)
   const [diagOn, setDiagOn] = useState(diagEnabled)
   const [diagText, setDiagText] = useState(report)
+  const [counts, setCounts] = useState<Array<[string, number]> | null>(null)
+  const [lastBackup, setLastBackup] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('jarvis.lastBackup')
+    } catch {
+      return null
+    }
+  })
 
-  // Der Name kommt aus einer Abfrage; beim ersten Rendern steht dort noch
-  // der Vorgabewert. Nachziehen, solange das Feld nicht bearbeitet wird.
   const lastLoaded = useRef(settings.displayName)
   if (lastLoaded.current !== settings.displayName) {
     lastLoaded.current = settings.displayName
     if (name !== settings.displayName) setName(settings.displayName)
   }
 
-  async function download(backup: Backup, name: string) {
+  // Einmal beim Öffnen zählen — die Übersicht ist der Grund, hier zu sein.
+  useMemo(() => {
+    void data.exportAll().then((b) => {
+      setCounts(
+        Object.entries(b)
+          .filter(([, v]) => Array.isArray(v))
+          .map(([k, v]) => [k, (v as unknown[]).length]),
+      )
+    })
+  }, [])
+
+  const total = counts?.reduce((s, [, n]) => s + n, 0) ?? 0
+  const backupStale =
+    lastBackup !== null && Date.now() - new Date(lastBackup).getTime() > 30 * 864e5
+
+  async function download(backup: Backup, filename: string) {
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = name
-    // In den Baum hängen und wieder heraus: Ohne das ignoriert Firefox den
-    // Klick. Und die Adresse erst später freigeben — Safari bricht den
-    // Download sonst ab, weil er beim Klick noch gar nicht begonnen hat.
+    a.download = filename
+    // In den Baum hängen (Firefox ignoriert sonst den Klick) und die
+    // Adresse erst später freigeben (Safari bricht den Download sonst ab).
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -90,34 +105,34 @@ export function Settings() {
   async function doExport() {
     const backup = await data.exportAll()
     await download(backup, `jarvis-${backup.exportedAt.slice(0, 10)}.json`)
+    try {
+      localStorage.setItem('jarvis.lastBackup', backup.exportedAt)
+    } catch {
+      /* voller Speicher — die Sicherung selbst ist trotzdem heruntergeladen */
+    }
+    setLastBackup(backup.exportedAt)
     setStatus('Sicherung heruntergeladen.')
   }
 
-  /* Einlesen ersetzt den gesamten Bestand — jede Tabelle wird geleert und
-     neu gefüllt. Das ist der einzige Knopf in dieser App, der alles auf
-     einmal vernichten kann, und er lag direkt neben dem zum Sichern.
-     Deshalb: erst zeigen, was in der Datei steht, dann fragen, und vorher
-     den aktuellen Stand als Datei herausgeben. */
+  /* Einlesen ersetzt den gesamten Bestand. Das ist der einzige Knopf, der
+     alles auf einmal vernichten kann — deshalb erst zeigen, was in der
+     Datei steht, dann fragen, und vorher den aktuellen Stand ausgeben. */
   async function doImport(file: File) {
     try {
       const parsed = JSON.parse(await file.text()) as Backup
       if (parsed.version !== 1) throw new Error('Unbekannte Dateiversion.')
 
       const current = await data.exportAll()
-      const incoming = countRecords(parsed)
-      const existing = countRecords(current)
-
       const ok = window.confirm(
         'Sicherung einlesen?\n\n' +
-          `Datei vom ${parsed.exportedAt?.slice(0, 10) ?? 'unbekannt'} mit ${incoming} Datensätzen.\n` +
-          `Dein jetziger Stand (${existing} Datensätze) wird dabei vollständig ersetzt.\n\n` +
-          'Zur Sicherheit wird er vorher als Datei heruntergeladen.',
+          `Datei vom ${parsed.exportedAt?.slice(0, 10) ?? 'unbekannt'} mit ${countRecords(parsed)} Datensätzen.\n` +
+          `Dein jetziger Stand (${countRecords(current)} Datensätze) wird vollständig ersetzt.\n\n` +
+          'Zur Sicherheit wird er vorher heruntergeladen.',
       )
       if (!ok) {
         setStatus('Abgebrochen — nichts verändert.')
         return
       }
-
       await download(current, `jarvis-vor-import-${current.exportedAt.slice(0, 10)}.json`)
       await data.importAll(parsed)
       refreshAll()
@@ -128,37 +143,214 @@ export function Settings() {
   }
 
   return (
-    <Page title="EINSTELLUNGEN">
-      <div className="strip" style={{ justifyContent: 'flex-start' }}>
-        <Pill
-          label="Speicherung"
-          value={isLocalMode ? 'Lokal' : 'Supabase'}
-          color={isLocalMode ? 'journal' : 'habits'}
-        />
+    <div className="g12">
+      {/* ── Daten zuerst: das ist die Frage, die hierher treibt ── */}
+      <div className="c7">
+        <Sec
+          title="Daten"
+          color="tasks"
+          right={
+            <span className="status">
+              <i className={`lamp ${isLocalMode ? 'lamp--off' : ''}`} aria-hidden="true" />
+              {isLocalMode ? 'Lokal' : 'Supabase'}
+            </span>
+          }
+        >
+          {counts === null ? (
+            <Empty>LADEN</Empty>
+          ) : (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Modul</th>
+                  <th className="num" style={{ width: '12ch' }}>
+                    Anzahl
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {counts.map(([k, n]) => (
+                  <tr key={k}>
+                    <td>{LABELS[k] ?? k}</td>
+                    <td className="num">{n || <Nil />}</td>
+                  </tr>
+                ))}
+                <tr className="sum">
+                  <td>Summe</td>
+                  <td className="num">{total}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          <div className="kv">
+            <em>Letzte Sicherung</em>
+            <b className={backupStale ? 'row__v--warn' : ''}>
+              {lastBackup ? shortDate(lastBackup.slice(0, 10)) : <Nil />}
+            </b>
+          </div>
+
+          <div className="btns" style={{ padding: '12px 8px 0' }}>
+            <Btn kind="pri" onClick={() => void doExport()}>
+              Sicherung laden
+            </Btn>
+            <Btn onClick={() => fileRef.current?.click()}>Sicherung einlesen</Btn>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) void doImport(f)
+                e.target.value = ''
+              }}
+            />
+          </div>
+          {status && (
+            <p className="empty" role="status">
+              {status}
+            </p>
+          )}
+        </Sec>
+
+        <Sec title="Diagnose" color="sport" grouped>
+          <Row>
+            <span className="row__n">
+              Wechsel aufzeichnen
+              <span className="row__m" style={{ display: 'block', whiteSpace: 'normal' }}>
+                Misst auf diesem Gerät, wie lange ein Seitenwechsel dauert.
+              </span>
+            </span>
+            <Toggle
+              checked={diagOn}
+              ariaLabel="Wechsel aufzeichnen"
+              onChange={(v) => {
+                setDiagEnabled(v)
+                setDiagOn(v)
+                setDiagText(report())
+              }}
+            />
+          </Row>
+          {diagOn && (
+            <>
+              <pre
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 11,
+                  lineHeight: 1.6,
+                  color: 'var(--ink-600)',
+                  overflowX: 'auto',
+                  maxHeight: 300,
+                  margin: '8px 0 0',
+                }}
+              >
+                {diagText}
+              </pre>
+              <div className="btns" style={{ padding: '12px 8px 0' }}>
+                <Btn onClick={() => setDiagText(report())}>Aktualisieren</Btn>
+                <Btn
+                  onClick={() => {
+                    const text = report()
+                    setDiagText(text)
+                    void navigator.clipboard
+                      ?.writeText(text)
+                      .then(() => setStatus('Bericht kopiert.'))
+                      .catch(() => setStatus('Kopieren ging nicht — Text markieren.'))
+                  }}
+                >
+                  Kopieren
+                </Btn>
+                <Btn
+                  onClick={() => {
+                    clearSamples()
+                    setDiagText(report())
+                  }}
+                >
+                  Zurücksetzen
+                </Btn>
+              </div>
+            </>
+          )}
+        </Sec>
       </div>
 
-      <div className="cols">
-        <GlassTile title="Darstellung">
-          <Toggle
-            label="Bewegte Effekte"
-            hint="Hintergrund-Raster, Radar-Sweep und der drehende Globus im Hub. Ausgeschaltet läuft die App auf langsamen Geräten spürbar ruhiger — gemessen rund zehn Bilder pro Sekunde."
-            checked={settings.ambient}
-            onChange={(v) => void save({ ambient: v })}
-          />
-          <Toggle
-            label="Ton"
-            hint="Kurze Rückmeldung beim Abhaken und wenn der Timer abläuft."
-            checked={settings.sound}
-            onChange={(v) => {
-              void save({ sound: v })
-              if (v) beep('on')
-            }}
-          />
-          <div className="row">
+      {/* ── Schalter als Panelgruppe an einer gemeinsamen rechten Kante ── */}
+      <div className="c5">
+        <Sec title="Darstellung" color="tasks">
+          <Row>
+            <span className="row__n">Thema</span>
+            <Seg
+              options={THEMES}
+              value={settings.theme}
+              onChange={(v) => void save({ theme: v as Theme })}
+              ariaLabel="Thema"
+            />
+          </Row>
+          <Row>
+            <span className="row__n">
+              Bewegte Effekte
+              <span className="row__m" style={{ display: 'block', whiteSpace: 'normal' }}>
+                Nur noch die Zahlenannäherung im Ring.
+              </span>
+            </span>
+            <Toggle
+              checked={settings.ambient}
+              ariaLabel="Bewegte Effekte"
+              onChange={(v) => void save({ ambient: v })}
+            />
+          </Row>
+          <Row>
+            <span className="row__n">Ton</span>
+            <Toggle
+              checked={settings.sound}
+              ariaLabel="Ton"
+              onChange={(v) => {
+                void save({ sound: v })
+                if (v) beep('on')
+              }}
+            />
+          </Row>
+        </Sec>
+
+        <Sec title="Ziele" color="study" grouped>
+          <Row>
+            <span className="row__n">Lernziel pro Tag</span>
+            <input
+              className="inp inp--num"
+              type="number"
+              min={15}
+              max={600}
+              step={15}
+              inputMode="numeric"
+              value={settings.studyGoalMinutes}
+              onChange={(e) => void save({ studyGoalMinutes: Math.max(15, Number(e.target.value)) })}
+              aria-label="Lernziel pro Tag in Minuten"
+            />
+            <span className="unit">min</span>
+          </Row>
+          <Row>
+            <span className="row__n">Länge eines Blocks</span>
+            <input
+              className="inp inp--num"
+              type="number"
+              min={5}
+              max={180}
+              step={5}
+              inputMode="numeric"
+              value={settings.focusBlockMinutes}
+              onChange={(e) => void save({ focusBlockMinutes: Math.max(5, Number(e.target.value)) })}
+              aria-label="Länge eines Blocks in Minuten"
+            />
+            <span className="unit">min</span>
+          </Row>
+        </Sec>
+
+        <Sec title="Profil" color="journal" grouped>
+          <Row>
             <span className="row__n">Name im Briefing</span>
-            {/* Gespeichert wird beim Verlassen des Feldes, nicht bei jedem
-                Buchstaben: „Alexander" waren vorher neun Schreibvorgänge —
-                mit Supabase neun Anfragen übers Netz für einen Namen. */}
+            {/* Beim Verlassen des Feldes speichern, nicht bei jedem
+                Buchstaben — mit Supabase wäre das eine Anfrage pro Zeichen. */}
             <input
               className="inp"
               value={name}
@@ -172,153 +364,17 @@ export function Settings() {
                 if (e.key === 'Enter') e.currentTarget.blur()
               }}
               aria-label="Name im Briefing"
-              style={{ width: 160 }}
+              style={{ width: 150 }}
             />
-          </div>
-          <p className="row__v" style={{ marginTop: 12, whiteSpace: 'normal', lineHeight: 1.7 }}>
-            IST IM SYSTEM „REDUZIERTE BEWEGUNG" AKTIV, STEHEN ALLE ANIMATIONEN
-            OHNEHIN STILL — UNABHÄNGIG VON DIESEM SCHALTER.
-          </p>
-        </GlassTile>
-
-        <GlassTile title="Ziele" color="study">
-          <div className="row">
-            <span className="row__n">
-              Lernziel pro Tag
-              <span style={{ display: 'block', fontSize: 12.5, color: 'var(--dim)' }}>
-                Speist den violetten Bogen im Hub.
-              </span>
-            </span>
-            <input
-              className="inp"
-              type="number"
-              min={15}
-              max={600}
-              step={15}
-              value={settings.studyGoalMinutes}
-              onChange={(e) => void save({ studyGoalMinutes: Math.max(15, Number(e.target.value)) })}
-              aria-label="Lernziel pro Tag in Minuten"
-              style={{ width: 100 }}
-            />
-          </div>
-          <div className="row">
-            <span className="row__n">
-              Länge eines Blocks
-              <span style={{ display: 'block', fontSize: 12.5, color: 'var(--dim)' }}>
-                Wann der Timer Bescheid gibt.
-              </span>
-            </span>
-            <input
-              className="inp"
-              type="number"
-              min={5}
-              max={180}
-              step={5}
-              value={settings.focusBlockMinutes}
-              onChange={(e) => void save({ focusBlockMinutes: Math.max(5, Number(e.target.value)) })}
-              aria-label="Länge eines Blocks in Minuten"
-              style={{ width: 100 }}
-            />
-          </div>
-        </GlassTile>
-      </div>
-
-      <GlassTile title="Diagnose" color="sport">
-        <Toggle
-          label="Wechsel aufzeichnen"
-          hint="Misst auf diesem Gerät, wie lange ein Seitenwechsel dauert. Nur einschalten, wenn wir einem Hänger nachgehen."
-          checked={diagOn}
-          onChange={(v) => {
-            setDiagEnabled(v)
-            setDiagOn(v)
-            setDiagText(report())
-          }}
-        />
-        {diagOn && (
-          <>
-            <p style={{ fontSize: 14, color: 'var(--dim)', margin: '12px 0' }}>
-              Tipp dich jetzt ein paar Mal durch die Seiten — auch dorthin, wo
-              es hängt. Danach hierher zurück und auf „Aktualisieren".
-            </p>
-            <pre
-              style={{
-                fontFamily: 'var(--mono)',
-                fontSize: 11,
-                lineHeight: 1.6,
-                color: 'var(--dim)',
-                whiteSpace: 'pre',
-                overflowX: 'auto',
-                maxHeight: 320,
-                margin: 0,
-              }}
-            >
-              {diagText}
-            </pre>
-            <div style={{ display: 'flex', gap: 9, marginTop: 12, flexWrap: 'wrap' }}>
-              <button type="button" className="btn btn--p m-sport" onClick={() => setDiagText(report())}>
-                Aktualisieren
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  const text = report()
-                  setDiagText(text)
-                  void navigator.clipboard
-                    ?.writeText(text)
-                    .then(() => setStatus('Bericht kopiert.'))
-                    .catch(() => setStatus('Kopieren ging nicht — Text von Hand markieren.'))
-                }}
-              >
-                Bericht kopieren
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  clearSamples()
-                  setDiagText(report())
-                }}
-              >
-                Zurücksetzen
-              </button>
+          </Row>
+          <Kv label="Speicherung" value={isLocalMode ? 'Nur dieser Browser' : 'Supabase'} />
+          {!isLocalMode && (
+            <div className="btns" style={{ padding: '12px 8px 0' }}>
+              <SignOutButton />
             </div>
-          </>
-        )}
-      </GlassTile>
-
-      <GlassTile title="Daten" color="journal">
-        <p style={{ fontSize: 14, color: 'var(--dim)', marginBottom: 14 }}>
-          {isLocalMode
-            ? 'Deine Daten liegen ausschließlich in diesem Browser. Lade regelmäßig eine Sicherung herunter — sie ist zugleich der Umzugskoffer, wenn wir später auf Supabase umstellen.'
-            : 'Deine Daten liegen in deinem Supabase-Projekt. Die Sicherung bleibt trotzdem sinnvoll.'}
-        </p>
-        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn--p m-journal" onClick={() => void doExport()}>
-            Sicherung herunterladen
-          </button>
-          <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
-            Sicherung einlesen
-          </button>
-          <SignOutButton />
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) void doImport(f)
-              e.target.value = ''
-            }}
-          />
-        </div>
-        {status && (
-          <p className="row__v" style={{ marginTop: 12 }} role="status">
-            {status.toUpperCase()}
-          </p>
-        )}
-      </GlassTile>
-    </Page>
+          )}
+        </Sec>
+      </div>
+    </div>
   )
 }

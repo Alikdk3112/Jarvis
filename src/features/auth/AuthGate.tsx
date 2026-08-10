@@ -20,7 +20,6 @@ import type { Session } from '@supabase/supabase-js'
 import { hasSupabase, supabase } from '../../lib/supabaseClient'
 import { useRefreshAll } from '../../lib/store'
 import { seedIfEmpty } from '../../lib/seed'
-import { AmbientLayer } from '../../components/AmbientLayer'
 
 const MIN_PASSWORD = 8
 
@@ -42,31 +41,25 @@ function humanError(message: string): string {
   return message
 }
 
+/* Kein Ambient-Layer mehr, keine Glasfläche: die Anmeldung ist eine
+   Spalte auf dem Seitengrund, mit derselben 1px-Regel wie jede Sektion. */
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <>
-      <AmbientLayer enabled />
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          minHeight: '100dvh',
-          display: 'grid',
-          placeItems: 'center',
-          padding:
-            'max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))' +
-            ' max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left))',
-        }}
-      >
-        <div style={{ width: 'min(420px, 100%)', display: 'flex', flexDirection: 'column', gap: 22 }}>
-          <span className="brand" style={{ justifyContent: 'center' }}>
-            <i />
-            JARVIS
-          </span>
-          {children}
-        </div>
+    <div
+      style={{
+        minHeight: '100dvh',
+        display: 'grid',
+        placeItems: 'center',
+        padding:
+          'max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))' +
+          ' max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left))',
+      }}
+    >
+      <div style={{ width: 'min(360px, 100%)', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <span className="hdr__brand">JARVIS</span>
+        {children}
       </div>
-    </>
+    </div>
   )
 }
 
@@ -109,9 +102,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (checking) {
     return (
       <Shell>
-        <p className="row__v" style={{ textAlign: 'center' }}>
-          SITZUNG WIRD GEPRÜFT …
-        </p>
+        <p className="empty">SITZUNG WIRD GEPRÜFT …</p>
       </Shell>
     )
   }
@@ -174,13 +165,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   return (
     <Shell>
-      <section className="tile">
-        <header className="tile__h">
-          <span className="orb" />
-          <span className="tile__t">{mode === 'signin' ? 'Anmeldung' : 'Konto anlegen'}</span>
+      <section className="sec m-tasks">
+        <header className="sec__h">
+          <span className="sec__bar" aria-hidden="true" />
+          <h2 className="sec__t">{mode === 'signin' ? 'Anmeldung' : 'Konto anlegen'}</h2>
         </header>
 
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <form className="form" onSubmit={submit}>
           <input
             className="inp"
             type="email"
@@ -204,8 +195,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
           />
 
           {mode === 'signup' && (
-            <p className="row__v" style={{ whiteSpace: 'normal', lineHeight: 1.7 }}>
-              MINDESTENS {MIN_PASSWORD} ZEICHEN · NUR FREIGESCHALTETE ADRESSEN KÖNNEN EIN KONTO ANLEGEN
+            <p className="empty" style={{ whiteSpace: 'normal', lineHeight: 1.6 }}>
+              Mindestens {MIN_PASSWORD} Zeichen · nur freigeschaltete Adressen
             </p>
           )}
 
@@ -214,29 +205,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
           </button>
 
           {error && (
-            <p
-              className="row__v"
-              style={{ color: 'var(--alert)', whiteSpace: 'normal', lineHeight: 1.7 }}
-              role="alert"
-            >
+            <p className="errline" role="alert" style={{ whiteSpace: 'normal' }}>
               {error}
             </p>
           )}
           {notice && (
-            <p
-              className="row__v"
-              style={{ color: 'var(--habits)', whiteSpace: 'normal', lineHeight: 1.7 }}
-              role="status"
-            >
+            <p className="empty" role="status" style={{ whiteSpace: 'normal', lineHeight: 1.6, color: 'var(--m-habits)' }}>
               {notice}
             </p>
           )}
         </form>
 
-        <div style={{ display: 'flex', gap: 9, marginTop: 16, flexWrap: 'wrap' }}>
+        <div className="btns" style={{ marginTop: 16 }}>
           <button
             type="button"
-            className="btn btn--sm"
+            className="btn"
             onClick={() => {
               setMode(mode === 'signin' ? 'signup' : 'signin')
               setError(null)
@@ -246,7 +229,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
             {mode === 'signin' ? 'Noch kein Konto?' : 'Zurück zur Anmeldung'}
           </button>
           {mode === 'signin' && (
-            <button type="button" className="btn btn--sm" onClick={() => void resetPassword()} disabled={busy}>
+            <button type="button" className="btn" onClick={() => void resetPassword()} disabled={busy}>
               Passwort vergessen
             </button>
           )}

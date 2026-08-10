@@ -1,475 +1,1038 @@
 /* ══════════════════════════════════════════════════════════════════════
-   HUD-Bausteine — portiert aus dem freigegebenen Entwurf 03.
-   Durchgehend rund: Kacheln, Kapseln, Punkte. Keine Eckwinkel mehr.
-   Kacheln setzen sich nur über Glas und einen Lichtschimmer oben ab.
+   LEDGER — Bausteine
+
+   Es gibt keine Kachel. Struktur entsteht aus drei Linienstärken und
+   Weißraum im Verhältnis 3:1. Genau drei Bausteine haben einen
+   umlaufenden Rahmen: Formularbereich, Modal, Popover.
+
+   Die 1px-Sektionsregel ist die Kachel.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── Glaskachel ───────────────────────────────────────────────────── */
-.tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  padding: 19px 21px;
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-tile);
-  background: var(--glass);
-  box-shadow: var(--glass-lift);
+/* ── 1 · Sektionskopf ──────────────────────────────────────────────────
+   22px-Zeile, links ein 2×12px-Signalstrich in Modulfarbe, daneben das
+   Label, das die Regel unterbricht. Rechts optional eine Kennzahl.
+   Ersetzt Kachel, Rahmen und Titelbalken vollständig. */
+.sec {
+  margin-top: var(--s-6);
 }
-/* Lichtschimmer an der Oberkante — ersetzt die alten Eckwinkel */
-.tile::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 16%;
-  right: 16%;
-  height: 1px;
-  border-radius: 2px;
-  opacity: 0.75;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--pc) 55%, transparent), transparent);
+.sec:first-child {
+  margin-top: 0;
 }
-.tile--sm {
-  padding: 14px 16px;
-  border-radius: var(--r-tile-sm);
+/* Sektionen einer Gruppe stoßen ohne Abstand aneinander — sie sind nur
+   durch die Regel getrennt. Ergibt ein durchlaufendes Instrumentenfeld
+   statt einer Kachelwolke. */
+.sec--grouped {
+  margin-top: 0;
 }
 
-.tile__h {
+.sec__h {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin-bottom: 15px;
+  gap: var(--s-3);
+  height: var(--h-head);
+  border-bottom: 1px solid var(--line);
 }
-.tile__t {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.19em;
-  text-transform: uppercase;
-  color: var(--pc);
-  white-space: nowrap;
-}
-.tile--sm .tile__t { font-size: 9px; }
-.tile--sm .tile__h { margin-bottom: 11px; }
-.tile__m {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  color: var(--dimmer);
-  white-space: nowrap;
-}
-/* Klickbare Kachel-Überschrift führt in die Modulansicht */
-.tile__link {
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-}
-.tile__link:hover { text-decoration: underline; text-underline-offset: 3px; }
-
-.orb {
+.sec__bar {
   flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  width: 2px;
+  height: 12px;
   background: var(--pc);
-  box-shadow: 0 0 9px var(--pc);
-  animation: hud-pulse 2.8s ease-in-out infinite;
 }
-@keyframes hud-pulse {
-  50% { opacity: 0.3; transform: scale(0.82); }
+/* Tasks trägt keinen Strich (siehe tokens.css). */
+.m-tasks > .sec__h > .sec__bar {
+  display: none;
 }
-
-/* ── Pille ────────────────────────────────────────────────────────── */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 17px;
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-pill);
-  background: var(--glass);
-  box-shadow: var(--glass-lift);
-  white-space: nowrap;
-}
-.pill em {
+.sec__t {
   font-family: var(--mono);
-  font-size: 9.5px;
-  font-style: normal;
-  letter-spacing: 0.15em;
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--dim);
-}
-.pill b {
-  font-family: var(--disp);
-  font-weight: 500;
-  font-size: 17px;
-  letter-spacing: 0.04em;
   color: var(--pc);
+  /* Die Legende unterbricht die Linie, statt darüber zu schweben. */
+  background: var(--bg);
+  padding-right: var(--s-3);
+  position: relative;
+  top: 1px;
+}
+.sec__sp {
+  flex: 1;
+}
+/* Kennzahl im Kopf: Legende links, Wert rechts, Verhältnis 2:1. */
+.sec__k {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  background: var(--bg);
+  padding-left: var(--s-3);
+  position: relative;
+  top: 1px;
+}
+.sec__k em {
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  font-style: normal;
+}
+.sec__k b {
+  font-family: var(--mono);
+  font-size: var(--t-20);
+  letter-spacing: -0.005em;
+  color: var(--ink-900);
   font-variant-numeric: tabular-nums;
 }
-.pill--flat {
-  padding: 5px 13px;
-  background: rgba(255, 255, 255, 0.035);
-  box-shadow: none;
-}
-.pill--flat b { font-size: 13px; }
-
-/* ── Runde Checkbox ───────────────────────────────────────────────── */
-.chk {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.03);
-  color: transparent;
-  cursor: pointer;
-  transition: 0.18s;
-}
-.chk svg { width: 11px; height: 11px; }
-.chk:hover { border-color: var(--pc); }
-.chk[aria-checked='true'] {
-  border-color: var(--pc);
-  background: color-mix(in srgb, var(--pc) 20%, transparent);
-  color: var(--pc);
-  box-shadow: 0 0 13px -3px var(--pc);
+.sec__b {
+  padding-top: var(--s-3);
 }
 
-/* ── Zeilen ───────────────────────────────────────────────────────── */
+/* ── 2 · Zeile ────────────────────────────────────────────────────────
+   28px. Die ganze Zeile ist Klickziel. Trenner ab der zweiten Zeile. */
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 0;
+  gap: var(--s-3);
+  min-height: var(--h-row);
+  padding: 0 var(--s-3);
+  border-top: 1px solid var(--line-hair);
 }
-.row + .row { border-top: 1px solid var(--hairline); }
+.row:first-child {
+  border-top: 0;
+}
+.row--act {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.row--act:hover {
+  background: var(--head);
+}
+.row--act:active {
+  background: var(--head);
+  transition: none;
+}
+/* Ausnahme: 2px linke Marke. Die Zeile wird nicht eingefärbt. */
+.row--warn {
+  box-shadow: inset 2px 0 0 var(--alert);
+}
 .row__n {
   flex: 1;
   min-width: 0;
-  font-size: 14.5px;
+  font-family: var(--sans);
+  font-size: var(--t-13);
+  color: var(--ink-800);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.row__v {
+.row__m {
+  flex: none;
   font-family: var(--mono);
-  font-size: 10.5px;
-  color: var(--dim);
+  font-size: var(--t-11);
+  letter-spacing: 0.01em;
+  color: var(--ink-600);
+}
+.row__v {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--t-12);
+  color: var(--ink-900);
   font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.row__v--warn {
+  color: var(--alert);
+}
+.row__done .row__n {
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-450);
+  color: var(--ink-450);
+}
+.row__a {
+  flex: none;
+  width: 36px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── 3 · Tabelle ──────────────────────────────────────────────────────
+   Ohne Außenrahmen. Spaltenbreiten in ch, damit Zahlenspalten nicht mit
+   dem Fenster atmen. */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.tbl th {
+  height: var(--h-head);
+  padding: 0 var(--s-3);
+  background: var(--head);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: var(--t-9);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  text-align: left;
+  /* Unter der Kopfzeile einrasten, nicht darunter verschwinden. */
+  position: sticky;
+  top: 40px;
+  z-index: 2;
+}
+@media (max-width: 899px) {
+  .tbl th {
+    top: 32px;
+  }
+}
+.tbl td {
+  height: var(--h-row);
+  padding: 0 var(--s-3);
+  font-family: var(--sans);
+  font-size: var(--t-13);
+  color: var(--ink-800);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.row__v b { color: var(--text); }
-/* Listen füllen ihre Kachel aus, statt unten Leerraum zu lassen */
-.fill {
-  flex: 1;
+.tbl tbody tr + tr td {
+  border-top: 1px solid var(--line-hair);
+}
+.tbl tbody tr:hover td {
+  background: var(--head);
+}
+.tbl .num {
+  font-family: var(--mono);
+  font-size: var(--t-12);
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.tbl .met {
+  font-family: var(--mono);
+  font-size: var(--t-11);
+  letter-spacing: 0.01em;
+  color: var(--ink-600);
+}
+.tbl .act {
+  width: 36px;
+  padding: 0;
+  text-align: right;
+}
+.tbl .warn {
+  color: var(--alert);
+}
+.tbl tr.warn td:first-child {
+  box-shadow: inset 2px 0 0 var(--alert);
+}
+.tbl .sum td {
+  border-top: 1px solid var(--line);
+  color: var(--ink-900);
+}
+/* Die zwei ausgewiesenen Stellen, an denen horizontal gescrollt wird.
+   Die Seite selbst tut es nie. */
+.scrollx {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.scrollx .tbl {
+  min-width: 460px;
+}
+.scrollx .tbl th:first-child,
+.scrollx .tbl td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+.scrollx .tbl th:first-child {
+  background: var(--head);
+  z-index: 3;
+}
+
+/* ── 4 · Zahlenanzeigen ──────────────────────────────────────────────── */
+/* Leitzahl: höchstens eine pro Ansicht. */
+.lead {
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
+  gap: var(--s-2);
 }
-
-/* ── DotRow: Wochenquote als sieben Punkte ────────────────────────── */
-.dots {
-  flex: none;
-  display: flex;
-  gap: 5px;
-}
-.dots i {
-  display: block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  transition: 0.2s;
-}
-.dots i.on {
-  background: var(--pc);
-  box-shadow: 0 0 8px -1px var(--pc);
-}
-
-/* ── DotMap: Aktivität als Kreise ─────────────────────────────────── */
-.dmap {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, 1fr);
-  gap: 4px;
-}
-.dmap i {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.055);
-}
-.dmap i[data-v='1'] { background: color-mix(in srgb, var(--habits) 24%, transparent); }
-.dmap i[data-v='2'] { background: color-mix(in srgb, var(--habits) 48%, transparent); }
-.dmap i[data-v='3'] { background: color-mix(in srgb, var(--habits) 74%, transparent); }
-.dmap i[data-v='4'] {
-  background: var(--habits);
-  box-shadow: 0 0 7px -1px var(--habits);
-}
-.dleg {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 13px;
+.lead__v {
   font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.11em;
-  color: var(--dimmer);
+  font-size: var(--t-28);
+  line-height: 32px;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
 }
-.dleg i {
-  display: block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.lead__v sup {
+  font-size: var(--t-9);
+  letter-spacing: 0.06em;
+  color: var(--ink-600);
+  vertical-align: 0.55em;
+  margin-left: 3px;
 }
-.dleg .sp { flex: 1; }
-
-/* ── Aufgaben ─────────────────────────────────────────────────────── */
-.tsk {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 8px 0;
-}
-.tsk + .tsk { border-top: 1px solid var(--hairline); }
-.tsk__b { flex: 1; min-width: 0; }
-.tsk__t { font-size: 14.5px; line-height: 1.35; }
-.tsk__m {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 4px;
+.lead__l {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--t-10);
   letter-spacing: 0.1em;
-  color: var(--dimmer);
+  text-transform: uppercase;
+  color: var(--ink-600);
 }
-.tsk__m .due { color: var(--alert); }
-.tsk[data-done='1'] .tsk__t {
-  text-decoration: line-through;
-  color: var(--dimmer);
+.lead--warn .lead__v {
+  color: var(--alert);
 }
-
-.chipx {
-  padding: 2px 8px;
-  border: 1px solid currentColor;
-  border-radius: var(--r-pill);
+/* Die einzigen zwei t-44 der App: Ringmitte im Cockpit, Timer in Study. */
+.big {
   font-family: var(--mono);
-  font-size: 8.5px;
-  letter-spacing: 0.1em;
-  white-space: nowrap;
+  font-size: var(--t-44);
+  line-height: 44px;
+  letter-spacing: -0.02em;
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
 }
-
-/* ── Ziele ────────────────────────────────────────────────────────── */
-.goal { padding: 9px 0; }
-.goal + .goal { border-top: 1px solid var(--hairline); }
-.goal__h {
+.big sup {
+  font-size: var(--t-9);
+  letter-spacing: 0.06em;
+  color: var(--ink-600);
+  vertical-align: 0.55em;
+  margin-left: 2px;
+}
+/* Feste Breite, damit die zählende Ziffer keine Nachbarn verschiebt. */
+.big--timer {
+  display: inline-block;
+  width: 8ch;
+}
+/* Kennzahlpaar in einer Zeile, an gemeinsamer rechter Kante. */
+.kv {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 11px;
+  gap: var(--s-3);
+  min-height: var(--h-row);
+  padding: 0 var(--s-3);
+  border-top: 1px solid var(--line-hair);
 }
-.goal__t { font-size: 14.5px; }
-.goal__d {
+.kv:first-child {
+  border-top: 0;
+}
+.kv em {
   font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.11em;
-  color: var(--dim);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  font-style: normal;
 }
-.goal__d.hot { color: var(--alert); }
+.kv b {
+  font-family: var(--mono);
+  font-size: var(--t-12);
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+.unit {
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  color: var(--ink-600);
+  margin-left: var(--s-2);
+}
+.nil {
+  color: var(--ink-450);
+}
+
+/* ── 5 · Eingabe ─────────────────────────────────────────────────────── */
+.inp {
+  height: var(--h-inp);
+  padding: 0 var(--s-3);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  color: var(--ink-800);
+  font-family: var(--sans);
+  font-size: var(--t-13);
+  transition: border-color 120ms linear;
+}
+.inp:focus {
+  border-color: var(--ink-600);
+}
+textarea.inp {
+  height: auto;
+  min-height: 96px;
+  padding: var(--s-3) 10px;
+  font-size: var(--t-15);
+  line-height: 23px;
+  max-width: 68ch;
+  resize: vertical;
+}
+.inp--num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  width: 6ch;
+  padding-right: var(--s-3);
+}
+/* Select: eigener Rahmen, eigene Schrift, aber der Pfeil und die
+   Optionsliste kommen vom System.
+
+   Der erste Versuch zeichnete den Chevron aus zwei linear-gradients —
+   das ist ein Verlauf, und Verläufe kommen in diesem System nicht vor,
+   auch nicht als 5px-Dreieck. Der Systempfeil ist auf iOS und macOS
+   ohnehin ein dezenter Chevron. */
+select.inp {
+  padding-right: var(--s-2);
+}
+
+.lbl {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--t-9);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  margin-bottom: var(--s-2);
+}
+
+/* ── 6 · Knöpfe ──────────────────────────────────────────────────────── */
+.btn {
+  height: var(--h-btn);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-800);
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  transition: background-color 120ms linear, color 120ms linear;
+}
+.btn:hover:not(:disabled) {
+  background: var(--head);
+}
+.btn:active:not(:disabled) {
+  background: var(--head);
+  transition: none;
+}
+.btn--p {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--bg);
+}
+.btn--p:hover:not(:disabled) {
+  background: var(--ink-800);
+  border-color: var(--ink-800);
+}
+.btn--x {
+  border-color: var(--alert);
+  color: var(--alert);
+}
+.btn:disabled {
+  color: var(--ink-450);
+  border-color: var(--line);
+  cursor: default;
+}
+/* Icon-Knopf: kein Rahmen, 16px-Zeichen, Trefferfläche über Größe. */
+.ibtn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-600);
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 0;
+  transition: background-color 120ms linear, color 120ms linear;
+}
+.ibtn:hover {
+  background: var(--head);
+  color: var(--ink-900);
+}
+.ibtn:active {
+  background: var(--head);
+  transition: none;
+}
+.ibtn--x:hover {
+  color: var(--alert);
+}
+.ibtn svg {
+  width: 16px;
+  height: 16px;
+}
+.btns {
+  display: flex;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ── 7 · Segment-Umschalter ───────────────────────────────────────────
+   Ersetzt jede Pille und jeden Kippschalter, auch AN | AUS. */
+.seg {
+  display: inline-flex;
+}
+.seg > button {
+  height: var(--h-seg);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  margin-left: -1px;
+  background: transparent;
+  color: var(--ink-600);
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 120ms linear, color 120ms linear;
+}
+.seg > button:first-child {
+  margin-left: 0;
+  border-radius: var(--r-2) 0 0 var(--r-2);
+}
+.seg > button:last-child {
+  border-radius: 0 var(--r-2) var(--r-2) 0;
+}
+.seg > button:hover {
+  color: var(--ink-800);
+}
+.seg > button[aria-pressed='true'],
+.seg > button[aria-checked='true'] {
+  background: var(--head);
+  color: var(--ink-900);
+  /* 2px-Unterstreichung in Modulfarbe als Zustandsmarke. */
+  box-shadow: inset 0 -2px 0 var(--pc);
+  z-index: 1;
+}
+
+/* ── 8 · Checkbox ─────────────────────────────────────────────────────
+   Satzmaterial, kein Icon. Haken ohne Füllung, kein Leuchten. */
+.chk {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 120ms linear, color 120ms linear;
+}
+/* Trefferfläche 28×28 (36×36 bei Fingerbedienung), ohne das Layout zu
+   dehnen: der Kasten wächst nach außen, das Quadrat bleibt 16px. */
+.chk::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.chk[aria-checked='true'] {
+  color: var(--pc);
+  border-color: var(--pc);
+}
+.chk svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.5;
+}
+.chk:hover {
+  border-color: var(--ink-600);
+}
+.chk:disabled {
+  border-color: var(--ink-450);
+  cursor: default;
+}
+
+/* ── 9 · Chip
+   Ohne Rahmen: der Tag ist ein Wort, kein Objekt. Vier Rähmchen in einer
+   Liste sind vier Dinge, die keine sein müssen. */
+.chip {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pc);
+}
+
+/* ── 10 · kbd ─────────────────────────────────────────────────────────── */
+.kbd {
+  height: 16px;
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  color: var(--ink-600);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── 11 · Ring ────────────────────────────────────────────────────────
+   Drei Bögen, 2px, Kappen stumpf. Kein Globus, keine Trabanten, keine
+   Wellenform, keine Rotation. Genau ein Instrument pro Ansicht. */
+.ring {
+  position: relative;
+  flex: none;
+  width: 132px;
+  height: 132px;
+}
+.ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ring__trk {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+}
+.ring__val {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: butt;
+  transition: stroke-dashoffset 240ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+.ring__c {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+.ring__leg {
+  display: flex;
+  flex-direction: column;
+}
+.ring__leg > div {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 20px;
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+.ring__leg i {
+  width: 4px;
+  height: 4px;
+  flex: none;
+  background: currentColor;
+}
+.ring__leg b {
+  margin-left: auto;
+  font-size: var(--t-12);
+  letter-spacing: 0;
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 12 · Balkendiagramm ─────────────────────────────────────────────── */
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-2);
+  height: 72px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+/* Gitterlinien bei 50 % und 100 %. */
+.bars::before,
+.bars::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--line-hair);
+}
+.bars::before {
+  top: 0;
+}
+.bars::after {
+  top: 50%;
+}
+.bars i {
+  flex: 1;
+  min-width: 0;
+  max-width: 18px;
+  background: var(--pc);
+  transition: none;
+}
+.bars i[data-today='1'] {
+  box-shadow: inset 0 2px 0 var(--ink-900);
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--s-2);
+  font-family: var(--mono);
+  font-size: var(--t-9);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+/* ── 13 · Sparkline ──────────────────────────────────────────────────── */
+.spark {
+  display: block;
+  width: 100%;
+  height: 40px;
+}
+.spark path {
+  fill: none;
+  stroke: var(--pc);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ── 14 · Fortschrittsbalken ─────────────────────────────────────────── */
 .pbar {
-  height: 5px;
-  margin-top: 9px;
-  border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.07);
-  overflow: hidden;
+  position: relative;
+  flex: 1;
+  min-width: 60px;
+  height: 4px;
+  background: var(--line);
 }
 .pbar i {
   display: block;
   height: 100%;
-  border-radius: var(--r-pill);
   background: var(--pc);
-  box-shadow: 0 0 10px -2px var(--pc);
-  transition: width 0.4s ease;
+  transition: none;
 }
-
-/* ── Buttons ──────────────────────────────────────────────────────── */
-.btn {
-  padding: 9px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--dim);
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: 0.18s;
-}
-.btn svg { display: block; width: 13px; height: 13px; }
-.btn:hover { color: var(--pc); border-color: color-mix(in srgb, var(--pc) 55%, transparent); }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn--p {
-  color: var(--pc);
-  border-color: color-mix(in srgb, var(--pc) 50%, transparent);
-  background: color-mix(in srgb, var(--pc) 13%, transparent);
-}
-.btn--p:hover { background: color-mix(in srgb, var(--pc) 24%, transparent); }
-.btn--sm { padding: 6px 14px; font-size: 9.5px; }
-
-.sel { display: flex; gap: 6px; flex-wrap: wrap; }
-.sel button {
-  padding: 5px 13px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--dim);
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.09em;
-  cursor: pointer;
-}
-.sel button[aria-pressed='true'] {
-  color: var(--pc);
-  border-color: color-mix(in srgb, var(--pc) 55%, transparent);
-  background: color-mix(in srgb, var(--pc) 14%, transparent);
-}
-
-/* ── Eingabefelder ────────────────────────────────────────────────── */
-.inp {
-  width: 100%;
-  padding: 10px 15px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  font-family: var(--body);
-  font-size: 14px;
-  outline: none;
-  transition: 0.16s;
-}
-textarea.inp {
-  border-radius: 18px;
-  resize: vertical;
-  min-height: 96px;
-  line-height: 1.6;
-}
-.inp::placeholder { color: var(--dimmer); }
-.inp:hover { border-color: rgba(255, 255, 255, 0.2); }
-.inp:focus {
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.12);
-}
-select.inp {
-  appearance: none;
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-}
-select.inp option { background: #0b1119; color: var(--text); }
-
-/* iOS zoomt beim Antippen in jedes Feld, dessen Schrift kleiner als 16px ist,
-   und kommt danach nicht von allein zurück. Auf Fingerbedienung deshalb 16px. */
-@media (pointer: coarse) {
-  .inp {
-    font-size: 16px;
-  }
-}
-
-/* ── Ring (ArcGauge) ──────────────────────────────────────────────── */
-.gauge { position: relative; flex: none; width: 132px; height: 132px; }
-.gauge svg { width: 100%; height: 100%; overflow: visible; }
-.gauge .trk { fill: none; stroke: rgba(255, 255, 255, 0.055); }
-.gauge .val {
-  fill: none;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.5s ease;
-}
-.gauge__c {
+/* Zielmarke: wo man bei linearem Verlauf heute stehen müsste. Bewertet
+   nicht, lässt bewerten. */
+.pbar u {
   position: absolute;
-  inset: 0;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--ink-450);
+}
+
+/* ── 15 · Heatmap ─────────────────────────────────────────────────────
+   140 Zellen ohne Übergang — sonst löst ein Themenwechsel 140
+   gleichzeitige Farbwechsel aus. */
+.hmap {
   display: grid;
-  place-content: center;
-  text-align: center;
+  grid-template-rows: repeat(7, 9px);
+  grid-auto-flow: column;
+  grid-auto-columns: 9px;
+  gap: var(--s-1);
 }
-.gauge__n {
-  font-family: var(--disp);
-  font-weight: 300;
-  font-size: 31px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
+.hmap i {
+  background: var(--hm-0);
+  transition: none;
 }
-.gauge__l {
-  margin-top: 6px;
-  font-family: var(--mono);
-  font-size: 8.5px;
-  letter-spacing: 0.19em;
-  color: var(--dim);
-}
-
-.kv { display: flex; flex-direction: column; gap: 11px; min-width: 0; }
-.kv > div {
+.hmap i[data-v='1'] { background: var(--hm-1); }
+.hmap i[data-v='2'] { background: var(--hm-2); }
+.hmap i[data-v='3'] { background: var(--hm-3); }
+.hmap i[data-v='4'] { background: var(--hm-4); }
+.hleg {
   display: flex;
-  justify-content: space-between;
-  gap: 14px;
+  align-items: center;
+  gap: var(--s-1);
+  margin-top: var(--s-3);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: var(--t-9);
+  letter-spacing: 0.14em;
+  color: var(--ink-600);
 }
-.kv span { color: var(--dim); letter-spacing: 0.1em; }
-.kv b {
-  font-family: var(--disp);
-  font-weight: 500;
-  font-size: 13px;
-  letter-spacing: 0.05em;
-  font-variant-numeric: tabular-nums;
+.hleg i {
+  width: 9px;
+  height: 9px;
+}
+.hleg span:first-child {
+  margin-right: var(--s-2);
+}
+.hleg span:last-child {
+  margin-left: var(--s-2);
 }
 
-/* ── Sparkline ────────────────────────────────────────────────────── */
-.chart { display: block; width: 100%; height: 112px; overflow: visible; margin-top: auto; }
-.chart .gl { stroke: rgba(255, 255, 255, 0.055); stroke-width: 1; }
-.chart .ln {
-  fill: none;
-  stroke: var(--pc);
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 0 5px var(--pc));
+/* ── 16 · Wochenraster ────────────────────────────────────────────────
+   Die Zelle ist Anzeige und Klickziel. Radius 0: sie ist Teil eines
+   Gitters, keine freistehende Checkbox. */
+.wgrid {
+  display: grid;
+  gap: var(--s-1);
+  align-items: center;
 }
-.chart .pt { fill: var(--pc); filter: drop-shadow(0 0 6px var(--pc)); }
-.chart .lb {
-  font-family: var(--mono);
-  font-size: 8px;
-  fill: var(--dimmer);
-  letter-spacing: 0.08em;
+.wgrid__h,
+.wgrid__r {
+  display: grid;
+  /* Neun Spalten: Name, sieben Tage, Wochenzähler. Mit acht Spalten
+     rutschte der Zähler in eine zweite Zeile. */
+  grid-template-columns: var(--wname) repeat(7, 30px) 5ch;
+  gap: var(--s-1);
+  align-items: center;
 }
-
-/* ── Leerzustand ──────────────────────────────────────────────────── */
-.empty {
-  padding: 20px;
-  border: 1px dashed rgba(255, 255, 255, 0.09);
-  border-radius: 18px;
+.wgrid {
+  --wname: minmax(0, 1fr);
+}
+.wgrid__h > span {
   font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  color: var(--dimmer);
+  font-size: var(--t-9);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-600);
   text-align: center;
 }
+.wgrid__h > span[data-today='1'] {
+  color: var(--ink-900);
+  box-shadow: inset 0 -2px 0 var(--m-habits);
+}
+.wgrid__n {
+  font-family: var(--sans);
+  font-size: var(--t-13);
+  color: var(--ink-800);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: var(--s-3);
+}
+.wcell {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-0);
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 120ms linear, color 120ms linear;
+}
+.wcell[data-today='1'] {
+  background: var(--head);
+}
+.wcell[aria-checked='true'] {
+  color: var(--m-habits);
+  border-color: var(--m-habits);
+}
+/* Künftige Tage sind leiser, nicht lauter. Die Vorgabe sah hier
+   --ink-450 vor — das ist in beiden Themen HELLER als --line und hätte
+   morgen auffälliger gemacht als gestern. */
+.wcell:disabled {
+  border-color: var(--line-hair);
+  cursor: default;
+}
+.wcell:disabled:hover {
+  border-color: var(--line-hair);
+}
+.wcell svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.5;
+}
 
-@media (prefers-reduced-motion: reduce) {
-  .orb { animation: none; }
-  .gauge .val,
-  .pbar i { transition: none; }
+/* ── 17 · Lampe ──────────────────────────────────────────────────────
+   4×4px, Radius 0, statisch. Kein Blinken, kein Puls, kein Kreis. */
+.lamp {
+  width: 4px;
+  height: 4px;
+  flex: none;
+  background: var(--pc);
+  display: inline-block;
+  vertical-align: 0.15em;
+}
+.lamp--off {
+  background: var(--ink-450);
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+/* ── 18 · Formularbereich ────────────────────────────────────────────
+   Die einzige Fläche mit Rahmen im Inhaltsbereich. Sie markiert Eingabe
+   gegen Anzeige, nicht Inhalt gegen Inhalt — und kommt je Ansicht
+   höchstens einmal vor. Ja, das ist eine Karte; sie heißt hier so. */
+.form {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: var(--s-4) 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.form__r {
+  display: flex;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.form__r > label {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 19 · Leerzeile, Ladezeile, Fehlerzeile ──────────────────────────
+   Alle im Fluss, nie schwebend, kein gestrichelter Rahmen, keine
+   Illustration, kein Skeleton-Schimmer. */
+.empty {
+  min-height: var(--h-row);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--s-3);
+  font-family: var(--mono);
+  font-size: var(--t-11);
+  letter-spacing: 0.01em;
+  color: var(--ink-600);
+  margin: 0;
+}
+.errline {
+  min-height: var(--h-row);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-3);
+  box-shadow: inset 2px 0 0 var(--alert);
+  font-family: var(--sans);
+  font-size: var(--t-13);
+  color: var(--alert);
+}
+
+/* ── 20 · Rückgängig-Zeile — ersetzt jede Toast-Blase ────────────────── */
+.undo {
+  min-height: var(--h-row);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-3);
+  border-top: 1px solid var(--line-hair);
+}
+.undo > span {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: var(--t-13);
+  color: var(--ink-450);
+  text-decoration: line-through;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 21 · Modal ──────────────────────────────────────────────────────── */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--scrim);
+  display: grid;
+  place-items: center;
+  padding: var(--s-4);
+}
+.modal {
+  width: min(360px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.modal__t {
+  font-family: var(--mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-900);
+}
+.modal__b {
+  font-family: var(--sans);
+  font-size: var(--t-15);
+  line-height: 23px;
+  color: var(--ink-800);
+  margin: 0;
+}
+.modal__f {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-3);
+}
+
+/* ── 22 · Kennzahlblock (Leitzahl + Diagramm auf einer Blickachse) ──── */
+.head2 {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-6);
+  flex-wrap: wrap;
+}
+
+/* ── Fingerziele ──────────────────────────────────────────────────────
+   Dichte bleibt für das Auge; nur was berührt wird, wächst. */
+@media (pointer: coarse) {
+  :root {
+    --h-btn: 32px;
+    --h-inp: 40px;
+    --h-seg: 32px;
+  }
+  .inp {
+    /* 16px verhindert, dass iOS beim Fokus hineinzoomt. */
+    font-size: var(--t-16);
+  }
+  textarea.inp {
+    min-height: 120px;
+    font-size: var(--t-16);
+  }
+  .row--act {
+    min-height: 36px;
+  }
+  .chk::after {
+    inset: -10px;
+  }
+  .ibtn {
+    width: 32px;
+    height: 32px;
+  }
+  .kbd {
+    display: none;
+  }
+  .wgrid__h,
+  .wgrid__r {
+    /* Am Handy entfällt der Zähler: 88 + 12 + 250 füllt die 350px
+       Inhaltsbreite exakt aus. Die Wochenquote steht ohnehin in der
+       Sektion BESTAND darunter. */
+    grid-template-columns: var(--wname) repeat(7, 34px);
+  }
+  .wgrid__r > .row__v:last-child,
+  .wgrid__h > span:last-child {
+    display: none;
+  }
+  .wcell {
+    width: 34px;
+    height: 34px;
+  }
+  .hmap {
+    grid-template-rows: repeat(7, 12px);
+    grid-auto-columns: 12px;
+  }
+  .hleg i {
+    width: 12px;
+    height: 12px;
+  }
 }

@@ -1,8 +1,22 @@
-/* Uni: Kurse mit ECTS, Klausurterminen und Noten, plus Semesterfortschritt. */
+/* ══════════════════════════════════════════════════════════════════════
+   Uni.
+
+   Wichtigste Information: die Tage bis zur nächsten Klausur.
+
+   Uni enthält zwei Zeitskalen — ECTS bewegen sich über Jahre,
+   Klausurtermine über Tage. Nur eine kann handlungsleitend sein, und es
+   ist nicht die, die sich zweimal im Semester ändert. Deshalb trägt der
+   Countdown die einzige Leitzahl der Ansicht und der Semesterstand liegt
+   im Ring.
+
+   Damit weiche ich bewusst von der Bausteinzuordnung ab, die „t-28 ECTS
+   bestanden" vorsah: der Ring trägt den Stand schon vollständig, und ihn
+   zusätzlich als größte Zahl zu setzen, verdoppelt eine Aussage und lässt
+   die einzige zeitkritische Zahl in Zellengröße untergehen.
+   ══════════════════════════════════════════════════════════════════════ */
 
 import { useState } from 'react'
-import { Page } from '../components/Page'
-import { ArcGauge, Empty, GlassTile, Icon, Pill } from '../components/hud'
+import { Btn, Empty, Icon, IconBtn, Kv, Lead, Nil, Ring, Sec } from '../components/hud'
 import { useCollection } from '../lib/store'
 import { useDeleteCourse } from '../lib/cascade'
 import { newId } from '../lib/id'
@@ -21,9 +35,19 @@ export function Uni() {
   const ectsDone = done.reduce((s, c) => s + c.ects, 0)
   const ectsTotal = courses.items.reduce((s, c) => s + c.ects, 0)
   const graded = done.filter((c) => c.grade !== null)
+  // Nach ECTS gewichtet, nicht arithmetisch.
   const avg = graded.length
     ? graded.reduce((s, c) => s + (c.grade as number) * c.ects, 0) / graded.reduce((s, c) => s + c.ects, 0)
     : null
+
+  const exams = open
+    .filter((c) => c.examDate)
+    .map((c) => ({ course: c, days: daysBetween(todayKey, c.examDate as string) }))
+    .filter((x) => x.days >= 0)
+    .sort((a, b) => a.days - b.days)
+  const next = exams[0] ?? null
+
+  const grade = (g: number | null) => (g === null ? <Nil /> : g.toFixed(1).replace('.', ','))
 
   async function add(e: React.FormEvent) {
     e.preventDefault()
@@ -44,145 +68,205 @@ export function Uni() {
   }
 
   return (
-    <Page title="UNI">
-      <div className="strip" style={{ justifyContent: 'flex-start' }}>
-        <Pill label="ECTS" value={`${ectsDone} / ${ectsTotal}`} color="study" />
-        <Pill label="Schnitt" value={avg ? avg.toFixed(2).replace('.', ',') : '—'} color="habits" />
-        <Pill label="Laufend" value={open.length} />
-      </div>
+    <>
+      {/* ── Messwertkopf: Countdown links, Ring direkt daneben, Rest der
+             Zeile bewusst leer. Keine Kachelpaarung, keine Zentrierung. ── */}
+      <Sec
+        title="Uni"
+        color="study"
+        metaLabel="Schnitt"
+        metaValue={avg ? avg.toFixed(2).replace('.', ',') : '–'}
+      >
+        <div className="head2" style={{ alignItems: 'center', padding: '8px 8px 4px' }}>
+          {next && (
+            <div
+              style={
+                next.days <= 14
+                  ? { boxShadow: 'inset 2px 0 0 var(--alert)', paddingLeft: 10 }
+                  : { paddingLeft: 10 }
+              }
+            >
+              <Lead
+                value={next.days}
+                unit="T"
+                label={`${next.course.name} · ${shortDate(next.course.examDate as string)}`}
+                warn={next.days <= 14}
+              />
+            </div>
+          )}
+          <Ring
+            arcs={[{ value: ectsTotal ? ectsDone / ectsTotal : 0, color: 'study' }]}
+            center={
+              <div>
+                <div className="sec__k">
+                  <b>{ectsDone}</b>
+                </div>
+                <div className="lead__l" style={{ textAlign: 'center' }}>
+                  von {ectsTotal}
+                </div>
+              </div>
+            }
+          />
+        </div>
+      </Sec>
 
-      <div className="cols">
-        <GlassTile title="Laufende Kurse" color="study" meta={`${open.length}`}>
-          {open.length === 0 ? (
-            <Empty>Keine laufenden Kurse.</Empty>
-          ) : (
-            open.map((c) => {
-              const days = c.examDate ? daysBetween(todayKey, c.examDate) : null
-              return (
-                <div className="row" key={c.id}>
-                  <span className="row__n">{c.name}</span>
-                  <span className="row__v">{c.ects} ECTS</span>
-                  {days !== null && (
-                    <span className="chipx" style={{ color: days <= 14 ? 'var(--alert)' : 'var(--journal)' }}>
-                      {days < 0 ? `VORBEI · ${shortDate(c.examDate as string)}` : `KLAUSUR ${days} T`}
-                    </span>
-                  )}
+      <div className="g12 blk">
+        <div className="c12">
+          <Sec title="Laufende Kurse" color="study" metaValue={open.length}>
+            {open.length === 0 ? (
+              <Empty>Keine laufenden Kurse — unten anlegen</Empty>
+            ) : (
+              <div className="scrollx">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>Kurs</th>
+                      <th className="num" style={{ width: '7ch' }} data-col="opt">
+                        Ects
+                      </th>
+                      <th className="num" style={{ width: '10ch' }}>
+                        Klausur
+                      </th>
+                      <th className="num" style={{ width: '6ch' }}>
+                        Note
+                      </th>
+                      <th className="act" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {open.map((c) => {
+                      const days = c.examDate ? daysBetween(todayKey, c.examDate) : null
+                      const hot = days !== null && days >= 0 && days <= 14
+                      return (
+                        <tr key={c.id} className={hot ? 'warn' : undefined}>
+                          <td>{c.name}</td>
+                          <td className="num" data-col="opt">
+                            {c.ects}
+                          </td>
+                          <td className={`num ${hot ? 'warn' : ''}`}>
+                            {days === null ? <Nil /> : days < 0 ? 'vorbei' : `${days} T`}
+                          </td>
+                          <td className="num">
+                            <input
+                              className="inp inp--num"
+                              type="number"
+                              step="0.1"
+                              min="1"
+                              max="5"
+                              placeholder="–"
+                              inputMode="decimal"
+                              aria-label={`Note für ${c.name} eintragen`}
+                              style={{ width: '5ch' }}
+                              onKeyDown={(e) => {
+                                if (e.key !== 'Enter') return
+                                const g = Number((e.target as HTMLInputElement).value)
+                                if (!g || g < 1 || g > 5) return
+                                void courses.put({ ...c, grade: g, passed: g <= 4 })
+                              }}
+                            />
+                          </td>
+                          <td className="act">
+                            <IconBtn
+                              icon="x"
+                              label={`${c.name} löschen`}
+                              danger
+                              onClick={() => void deleteCourse(c.id)}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <Kv label="Note eintragen und Enter" value="gilt als abgeschlossen" />
+          </Sec>
+
+          {done.length > 0 && (
+            <Sec title="Abgeschlossen" color="habits" grouped metaLabel="Ects" metaValue={ectsDone}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Kurs</th>
+                    <th className="num" style={{ width: '7ch' }} data-col="opt">
+                      Ects
+                    </th>
+                    <th className="num" style={{ width: '6ch' }}>
+                      Note
+                    </th>
+                    <th className="act" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {done.map((c) => (
+                    <tr key={c.id} className={c.grade !== null && c.grade > 4 ? 'warn' : undefined}>
+                      <td>{c.name}</td>
+                      <td className="num" data-col="opt">
+                        {c.ects}
+                      </td>
+                      <td className="num">{grade(c.grade)}</td>
+                      <td className="act">
+                        <IconBtn
+                          icon="minus"
+                          label={`${c.name} wieder öffnen`}
+                          onClick={() => void courses.put({ ...c, passed: false, grade: null })}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Sec>
+          )}
+
+          <Sec title="Neuer Kurs" color="study" grouped>
+            <form className="form" onSubmit={add}>
+              <label>
+                <span className="lbl">Kurs</span>
+                <input
+                  className="inp"
+                  placeholder="z. B. Operations Research"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  aria-label="Name des Kurses"
+                  style={{ width: '100%', maxWidth: 380 }}
+                />
+              </label>
+              <div className="form__r">
+                <label>
+                  <span className="lbl">Ects</span>
+                  <input
+                    className="inp inp--num"
+                    type="number"
+                    min={1}
+                    max={30}
+                    inputMode="numeric"
+                    value={ects}
+                    onChange={(e) => setEcts(Math.max(1, Number(e.target.value)))}
+                    aria-label="ECTS"
+                  />
+                </label>
+                <label>
+                  <span className="lbl">Klausur</span>
                   <input
                     className="inp"
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    max="5"
-                    placeholder="Note"
-                    style={{ width: 84 }}
-                    aria-label={`Note für ${c.name} eintragen`}
-                    onKeyDown={(e) => {
-                      if (e.key !== 'Enter') return
-                      const grade = Number((e.target as HTMLInputElement).value.replace(',', '.'))
-                      if (!grade || grade < 1 || grade > 5) return
-                      void courses.put({ ...c, grade, passed: grade <= 4 })
-                    }}
+                    type="date"
+                    value={examDate}
+                    onChange={(e) => setExamDate(e.target.value)}
+                    aria-label="Klausurtermin"
+                    style={{ width: 150 }}
                   />
-                  <button
-                    type="button"
-                    className="btn btn--sm"
-                    style={{ padding: '6px 10px' }}
-                    onClick={() => void deleteCourse(c.id)}
-                    aria-label={`${c.name} löschen`}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
-              )
-            })
-          )}
-          <p className="row__v" style={{ marginTop: 12 }}>
-            NOTE EINTRAGEN UND ENTER — DER KURS GILT DANN ALS ABGESCHLOSSEN
-          </p>
-        </GlassTile>
-
-        <GlassTile title="Semesterfortschritt" color="study">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, justifyContent: 'center' }}>
-            <ArcGauge
-              value={ectsTotal ? ectsDone / ectsTotal : 0}
-              label={`${ectsDone}`}
-              caption={`VON ${ectsTotal} ECTS`}
-              color="study"
-              size={150}
-            />
-            <div className="kv">
-              <div>
-                <span>BESTANDEN</span>
-                <b>{done.length}</b>
+                </label>
+                <span style={{ flex: 1 }} />
+                <Btn kind="pri" type="submit" disabled={!name.trim()}>
+                  <Icon name="plus" /> Anlegen
+                </Btn>
               </div>
-              <div>
-                <span>OFFEN</span>
-                <b>{open.length}</b>
-              </div>
-              <div>
-                <span>SCHNITT</span>
-                <b style={{ color: 'var(--habits)' }}>{avg ? avg.toFixed(2).replace('.', ',') : '—'}</b>
-              </div>
-            </div>
-          </div>
-
-          <form onSubmit={add} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 20 }}>
-            <input
-              className="inp"
-              placeholder="Neuer Kurs"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              aria-label="Name des Kurses"
-            />
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <input
-                className="inp"
-                type="number"
-                min={1}
-                max={30}
-                value={ects}
-                onChange={(e) => setEcts(Math.max(1, Number(e.target.value)))}
-                aria-label="ECTS"
-                style={{ width: 90 }}
-              />
-              <input
-                className="inp"
-                type="date"
-                value={examDate}
-                onChange={(e) => setExamDate(e.target.value)}
-                aria-label="Klausurtermin"
-                style={{ width: 168 }}
-              />
-              <button type="submit" className="btn btn--p m-study" disabled={!name.trim()}>
-                <Icon name="plus" /> Anlegen
-              </button>
-            </div>
-          </form>
-        </GlassTile>
+            </form>
+          </Sec>
+        </div>
       </div>
-
-      {done.length > 0 && (
-        <GlassTile title="Abgeschlossen" color="habits" meta={`${ectsDone} ECTS`}>
-          {done.map((c) => (
-            <div className="row" key={c.id}>
-              <span className="row__n">{c.name}</span>
-              <span className="row__v">{c.ects} ECTS</span>
-              <span className="chipx" style={{ color: 'var(--habits)' }}>
-                {c.grade?.toFixed(1).replace('.', ',') ?? 'BESTANDEN'}
-              </span>
-              <button
-                type="button"
-                className="btn btn--sm"
-                style={{ padding: '6px 10px' }}
-                onClick={() => void courses.put({ ...c, passed: false, grade: null })}
-                aria-label={`${c.name} wieder öffnen`}
-              >
-                <Icon name="x" />
-              </button>
-            </div>
-          ))}
-        </GlassTile>
-      )}
-    </Page>
+    </>
   )
 }
