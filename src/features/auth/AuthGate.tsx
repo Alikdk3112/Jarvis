@@ -15,7 +15,7 @@
    `allowed_emails` durch.
    ══════════════════════════════════════════════════════════════════════ */
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { hasSupabase, supabase } from '../../lib/supabaseClient'
 import { useRefreshAll } from '../../lib/store'
@@ -65,10 +65,23 @@ function Shell({ children }: { children: ReactNode }) {
 
 type Mode = 'signin' | 'signup'
 
+/* Für welche Kennung die Erstbefüllung schon versucht wurde. Steht bewusst
+   ausserhalb der Komponente: ein Zustand darin würde beim Neuaufbau der
+   Komponente verschwinden, und dann liefe die Befüllung erneut. */
+let seededFor: string | null = null
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const refreshAll = useRefreshAll()
   const [session, setSession] = useState<Session | null>(null)
   const [checking, setChecking] = useState(hasSupabase)
+
+  /* Der Effekt unten darf sich unter keinen Umständen erneut einhängen. Damit
+     das nicht daran hängt, ob `useRefreshAll` seine Identität behält, liest er
+     die Funktion aus einer Referenz statt aus der Abhängigkeitsliste. Genau
+     diese Kopplung hat die Schleife verursacht; sie kommt hier nicht zurück,
+     auch wenn an store.ts jemand das useCallback entfernt. */
+  const refreshRef = useRef(refreshAll)
+  refreshRef.current = refreshAll
 
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
@@ -77,24 +90,63 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
+  /* Genau einmal einhängen — hier lag der Hänger.
+
+     Vorher stand `refreshAll` in der Abhängigkeitsliste dieses Effekts. Die
+     Funktion war ohne useCallback bei jedem Rendern eine neue, der Effekt lief
+     also jedes Mal neu: aushängen, wieder einhängen. Supabase schickt beim
+     Einhängen aber sofort die laufende Sitzung nach, `setSession` bekam ein
+     frisches Objekt, das nächste Rendern folgte — und mit ihm die nächste
+     Einhängung. In jedem Umlauf feuerte `seedIfEmpty()` seine drei Abfragen.
+     Gemessen: rund 1750 Anfragen je Sekunde gegen Supabase, dauerhaft, ohne
+     dass der Nutzer etwas tat.
+
+     In der Entwicklung war davon nichts zu sehen, weil der Effekt im lokalen
+     Modus in der ersten Zeile zurückkehrt. Die Schleife existierte nur im
+     Supabase-Modus — und der läuft nur im ausgelieferten Bau, also genau dort,
+     wo niemand mitliest. */
   useEffect(() => {
     if (!supabase) return
+    let alive = true
+
     void supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return
       setSession(data.session)
       setChecking(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      if (!alive) return
       setSession(next)
-      if (!next) return
-      // Beim allerersten Login ist das Konto leer — dann einmal befüllen,
-      // damit kein nacktes Gerüst dasteht. Danach immer neu laden, weil
-      // vorher leere Ergebnisse im Cache lagen.
+      setChecking(false)
+
+      /* Nur bei einem echten Anmelde-Übergang befüllen. `INITIAL_SESSION`
+         kommt bei jedem Einhängen, `TOKEN_REFRESHED` etwa jede Stunde —
+         beides ist keine Anmeldung und darf nichts auslösen. Der Riegel auf
+         die Kennung fängt zusätzlich, dass Supabase `SIGNED_IN` mehrfach für
+         dieselbe Sitzung schickt, etwa beim Zurückkehren in den Vordergrund. */
+      if (event !== 'SIGNED_IN' || !next) return
+      if (seededFor === next.user.id) return
+      seededFor = next.user.id
+
       void seedIfEmpty()
-        .catch((err) => console.error('Erstbefüllung fehlgeschlagen:', err))
-        .finally(refreshAll)
+        .then((befüllt) => {
+          /* Nur nach echter Erstbefüllung alles neu laden — vorher lagen
+             leere Ergebnisse im Zwischenspeicher. Ohne Befüllung wäre es
+             eine vollständige Abfrage aller zehn Sammlungen für nichts. */
+          if (befüllt) refreshRef.current()
+        })
+        .catch((err) => {
+          seededFor = null // Ein Fehlversuch gilt nicht als erledigt.
+          console.error('Erstbefüllung fehlgeschlagen:', err)
+        })
     })
-    return () => sub.subscription.unsubscribe()
-  }, [refreshAll])
+
+    return () => {
+      alive = false
+      sub.subscription.unsubscribe()
+    }
+  }, [])
 
   // Ohne Supabase gibt es nichts zu bewachen.
   if (!hasSupabase) return <>{children}</>

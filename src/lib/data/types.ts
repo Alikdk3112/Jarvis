@@ -154,6 +154,11 @@ export const DEFAULT_SETTINGS: Settings = {
 /** Einheitliche Sammlung — `put` legt an oder aktualisiert. */
 export interface Repo<T extends { id: ID }> {
   list(): Promise<T[]>
+  /** Liegt hier überhaupt etwas? Nur dafür — und ohne Zeilen zu übertragen.
+   *  Die Erstbefüllung stellt genau diese Frage an drei Sammlungen; sie
+   *  vorher mit `list()` zu beantworten lud drei vollständige Tabellen
+   *  herunter, um eine Summe mit Null zu vergleichen. */
+  hasAny(): Promise<boolean>
   put(item: T): Promise<T>
   /** Viele Zeilen auf einmal. Einzeln geschrieben wären das ebenso viele
    *  Netzanfragen — die Erstbefüllung allein bräuchte so Minuten. */

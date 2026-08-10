@@ -26,9 +26,20 @@
    Laufweite und Helligkeit (--ink-600 gegen --ink-900), nicht über
    Gewicht — das war ohnehin die Absicht. Gewichte ab 700 kommen im
    System nicht vor. */
+/* Der Pfad ist bewusst relativ und die Datei liegt bewusst unter src/, nicht
+   unter public/. Vorher stand hier `url('/fonts/…')` — eine absolute Adresse,
+   die Vite nicht auf `base` umschreibt. Ausgeliefert wird die App aber unter
+   /Jarvis/, dort zeigte der Pfad also auf den Wurzelbereich der Domain und
+   lieferte 404: Plex Mono hat am Telefon nie geladen, jede Zahl lief in der
+   Ersatzschrift des Systems. Über src/ wandert die Datei durch den Bau, wird
+   mit Prüfsumme benannt und bekommt die richtige Adresse — in jedem
+   Basisverzeichnis.
+
+   WOFF2 statt TTF: dieselben Zeichen in 39 statt 134 KB. Über Mobilfunk ist
+   das der Unterschied zwischen einem und drei Paketen. */
 @font-face {
   font-family: 'PlexMono';
-  src: url('/fonts/IBMPlexMono-Regular.ttf') format('truetype');
+  src: url('../fonts/IBMPlexMono-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;

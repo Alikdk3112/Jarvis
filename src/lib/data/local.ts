@@ -65,6 +65,8 @@ const db = new JarvisDB()
 function repo<T extends { id: ID }>(table: Table<T, ID>): Repo<T> {
   return {
     list: () => table.toArray(),
+    // Dexie zählt über den Index, ohne die Datensätze zu lesen.
+    hasAny: async () => (await table.count()) > 0,
     async put(item) {
       await table.put(item)
       return item

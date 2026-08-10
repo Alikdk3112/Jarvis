@@ -17,16 +17,22 @@ const now = () => new Date().toISOString()
 /** Ist noch gar nichts da? Fragt den aktiven Adapter, nicht die Datenbank —
  *  damit dieselbe Prüfung lokal wie in Supabase funktioniert. */
 async function isEmpty(): Promise<boolean> {
+  /* Nur die Frage stellen, nicht die Tabellen holen. Vorher stand hier
+     dreimal `list()` — drei vollständige Downloads, um eine Summe mit Null
+     zu vergleichen. `hasAny()` überträgt in Supabase keine einzige Zeile. */
   const [habits, tasks, courses] = await Promise.all([
-    data.habits.list(),
-    data.tasks.list(),
-    data.courses.list(),
+    data.habits.hasAny(),
+    data.tasks.hasAny(),
+    data.courses.hasAny(),
   ])
-  return habits.length + tasks.length + courses.length === 0
+  return !habits && !tasks && !courses
 }
 
-export async function seedIfEmpty(): Promise<void> {
-  if (!(await isEmpty())) return
+/** Gibt zurück, ob tatsächlich befüllt wurde. Der Aufrufer lädt nur dann alles
+ *  neu — bei einem bestehenden Konto wären das zehn vollständige Abfragen für
+ *  ein Ergebnis, das er schon hat. */
+export async function seedIfEmpty(): Promise<boolean> {
+  if (!(await isEmpty())) return false
 
   const t = today()
 
@@ -116,4 +122,6 @@ export async function seedIfEmpty(): Promise<void> {
     }
   })
   await data.studySessions.putMany(sessions)
+
+  return true
 }

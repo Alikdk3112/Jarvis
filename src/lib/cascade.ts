@@ -63,7 +63,11 @@ export function useDeleteCourse(): (id: ID) => Promise<void> {
   return useCallback(
     async (id) => {
       const orphans = sessions.items.filter((s) => s.courseId === id)
-      for (const s of orphans) await sessions.put({ ...s, courseId: null })
+      // In einem Zug, nicht in einer Schleife: einzeln geschrieben wäre das
+      // eine Netzrunde je Lerneinheit, und ein Kurs kann Dutzende haben.
+      if (orphans.length) {
+        await sessions.putMany(orphans.map((s) => ({ ...s, courseId: null })))
+      }
       await courses.remove(id)
     },
     [courses, sessions],

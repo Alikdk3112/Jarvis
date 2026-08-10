@@ -30,10 +30,23 @@ import { requireSupabase } from '../supabaseClient'
 
 type Row = Record<string, unknown>
 
+/* Die Kennung des angemeldeten Nutzers — aus der Sitzung, nicht vom Server.
+ *
+ * Hier stand `auth.getUser()`. Das liest nicht aus dem Speicher, sondern
+ * schickt jedes Mal ein `GET /auth/v1/user` los; nachzulesen in auth-js,
+ * `GoTrueClient._getUser`: ohne übergebenes Token holt es zwar die Sitzung,
+ * ruft damit aber trotzdem den Server. Weil jeder Schreibvorgang die Kennung
+ * braucht, kostete jedes Häkchen eine zusätzliche Netzrunde, bevor überhaupt
+ * geschrieben wurde — über Mobilfunk die Hälfte der Wartezeit für nichts.
+ *
+ * `getSession()` liest aus dem Speicher und geht nur dann ans Netz, wenn das
+ * Token abgelaufen ist und erneuert werden muss. Genau das ist gewollt: im
+ * Normalfall keine Runde, aber weiterhin eine gültige Anmeldung. */
 async function currentUserId(): Promise<string> {
-  const { data, error } = await requireSupabase().auth.getUser()
-  if (error || !data.user) throw new Error('Nicht angemeldet.')
-  return data.user.id
+  const { data, error } = await requireSupabase().auth.getSession()
+  const id = data.session?.user.id
+  if (error || !id) throw new Error('Nicht angemeldet.')
+  return id
 }
 
 /** camelCase → snake_case und zurück. Die Spaltennamen folgen exakt dieser
@@ -63,6 +76,16 @@ function repo<T extends { id: ID }>(table: string, orderBy?: string): Repo<T> {
       const { data, error } = orderBy ? await q.order(orderBy) : await q
       if (error) throw error
       return (data ?? []).map((r) => rowToModel<T>(r as Row))
+    },
+    async hasAny() {
+      // `head: true` überträgt keine Zeilen, nur die Anzahl im Kopf der
+      // Antwort. Zusammen mit limit(1) ist das die billigste Form der Frage.
+      const { count, error } = await requireSupabase()
+        .from(table)
+        .select('id', { head: true, count: 'exact' })
+        .limit(1)
+      if (error) throw error
+      return (count ?? 0) > 0
     },
     async put(item) {
       const userId = await currentUserId()
