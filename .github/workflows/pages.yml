@@ -41,6 +41,9 @@ jobs:
           BASE_PATH: /Jarvis/
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Kennzeichen des Baus. Steht danach in den Einstellungen und im
+          # Diagnosebericht, damit am Gerät ablesbar ist, welche Fassung läuft.
+          BUILD_TIME: ${{ github.run_started_at }}
         run: npm run build
 
       # GitHub Pages kennt keine Umleitungen: ohne diese Kopie liefert ein
@@ -52,8 +55,21 @@ jobs:
         with:
           path: dist
 
+  # Veröffentlichen kann nur der Standardbranch.
+  #
+  # Die Umgebung `github-pages` ist auf main beschränkt, und `deploy-pages`
+  # bricht auf jedem anderen Branch nach zwei Sekunden ab. Diese Bedingung war
+  # nicht da — mit der Folge, dass jeder Push auf den Arbeitsbranch brav baute,
+  # dann rot wurde, und der Eindruck entstand, es sei ausgeliefert. Ein Fix lag
+  # so wochenlang gebaut und unveröffentlicht herum, während am Telefon der
+  # alte Stand lief.
+  #
+  # Jetzt ist das ehrlich: auf einem Branch läuft nur der Bau — er beweist,
+  # dass Typen und Bündel in Ordnung sind — und das Veröffentlichen wird
+  # übersprungen statt zu scheitern.
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

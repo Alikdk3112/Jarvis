@@ -368,6 +368,12 @@ export function Settings() {
             />
           </Row>
           <Kv label="Speicherung" value={isLocalMode ? 'Nur dieser Browser' : 'Supabase'} />
+          {/* Welcher Bau hier läuft. Klingt nach Kleinigkeit, ist aber die
+              Antwort auf „habe ich die neue Fassung überhaupt?" — und die war
+              einmal nicht zu beantworten, während am Telefon wochenlang ein
+              alter Stand lief, weil das Ausliefern still gescheitert war. */}
+          <Kv label="Fassung" value={__BUILD_SHA__} />
+          <Kv label="Gebaut" value={__BUILD_AT__} />
           {!isLocalMode && (
             <div className="btns" style={{ padding: '12px 8px 0' }}>
               <SignOutButton />

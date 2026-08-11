@@ -10,8 +10,25 @@ const here = import.meta.dirname
 // BASE_PATH; lokal bleibt es '/', damit npm run dev unverändert läuft.
 const base = process.env.BASE_PATH || '/'
 
+/* Kennzeichen des Baus, damit am Gerät ablesbar ist, welche Fassung läuft.
+   Das fehlte und hat einmal richtig Zeit gekostet: Ein Fix war gebaut,
+   gepusht und beim Ausliefern gescheitert — am Telefon lief weiter die alte
+   Fassung, und nichts in der App sagte das. Jetzt steht es in den
+   Einstellungen und im Diagnosebericht.
+
+   Im Workflow liefern GITHUB_SHA und der Zeitstempel die Werte; lokal steht
+   „dev", damit man den Unterschied sieht. */
+const build = {
+  sha: (process.env.GITHUB_SHA || 'dev').slice(0, 7),
+  at: process.env.BUILD_TIME || new Date().toISOString().slice(0, 16).replace('T', ' '),
+}
+
 export default defineConfig({
   base,
+  define: {
+    __BUILD_SHA__: JSON.stringify(build.sha),
+    __BUILD_AT__: JSON.stringify(build.at),
+  },
   plugins: [
     react(),
     tailwindcss(),

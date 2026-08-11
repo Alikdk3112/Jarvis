@@ -145,6 +145,7 @@ export function report(): string {
   const n = navigator as Navigator & Nav
   const lines: string[] = []
   lines.push('JARVIS Diagnose')
+  lines.push(`Fassung: ${__BUILD_SHA__} · gebaut ${__BUILD_AT__}`)
   lines.push(`Gerät: ${n.userAgent}`)
   lines.push(
     `Kerne: ${n.hardwareConcurrency ?? '?'} · Speicher: ${n.deviceMemory ?? '?'} GB · Netz: ${n.connection?.effectiveType ?? '?'}`,
