@@ -1,0 +1,62 @@
+# Cache-Regeln.
+#
+# Das ist die Datei, die auf GitHub Pages gefehlt hat, und ihr Fehlen war eine
+# der drei Fallen: dort kommt jede Datei mit zehn Minuten Cache, auch
+# index.html und sw.js. Zusammen mit einem Service Worker kann das ein Gerät
+# auf einem alten Stand festnageln, obwohl längst ein neuer ausgeliefert ist.
+#
+# Die Regel dahinter ist einfach und hängt nur daran, ob der Dateiname eine
+# Prüfsumme trägt:
+#
+#   · Name mit Prüfsumme  → ändert sich nie, also für immer behalten.
+#   · Name ohne Prüfsumme → ändert sich still, also jedes Mal nachfragen.
+
+# Der Einstieg. Enthält die Verweise auf die gehashten Dateien und ist damit
+# das Einzige, was bei einem neuen Bau anders aussieht. Wird er zwischen-
+# gespeichert, bleibt das Gerät auf dem alten Bündel — genau der Fall, den
+# niemand nachvollziehen kann. no-store, nicht no-cache: kein Zwischenstand,
+# aus dem heraus doch noch alt ausgeliefert wird.
+/
+  Cache-Control: no-store
+
+/index.html
+  Cache-Control: no-store
+
+# Der Service Worker entscheidet, was das Gerät offline sieht. Eine veraltete
+# Fassung von ihm ist der Unterschied zwischen „aktualisiert sich" und
+# „aktualisiert sich nie mehr". Browser fragen ihn inzwischen von selbst
+# regelmäßig nach; darauf verlassen wir uns hier trotzdem nicht.
+/sw.js
+  Cache-Control: no-store
+
+/registerSW.js
+  Cache-Control: no-store
+
+# Alles mit Prüfsumme im Namen: ein Jahr, unveränderlich. Ändert sich der
+# Inhalt, ändert sich der Name — dann wird ohnehin eine andere Datei geholt.
+# `immutable` sagt dem Browser zusätzlich, dass er nicht einmal nachfragen
+# muss. Hier liegen die Bündel, das CSS und die Schrift.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Das Manifest darf sich ändern (Name, Farben, Symbole), trägt aber keine
+# Prüfsumme. Ein Tag ist der Kompromiss.
+/manifest.webmanifest
+  Cache-Control: public, max-age=86400
+
+# Symbole und Startbilder ändern sich praktisch nie und sind gross. Eine Woche,
+# aber nicht unveränderlich — sie tragen keine Prüfsumme, ein Austausch soll
+# also irgendwann ankommen.
+/icon-*.png
+  Cache-Control: public, max-age=604800
+/apple-touch-icon.png
+  Cache-Control: public, max-age=604800
+/splash-*.png
+  Cache-Control: public, max-age=604800
+
+# Gilt für alles: Diese App wird nirgends eingebettet, und sie soll nirgends
+# eingebettet werden können.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin

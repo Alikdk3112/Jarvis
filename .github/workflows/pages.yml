@@ -1,13 +1,21 @@
-# Baut die App und veröffentlicht sie auf GitHub Pages.
+# Prüft jeden Push und veröffentlicht von main auf GitHub Pages.
 #
 # Der Bau läuft auf GitHubs Runnern, nicht lokal — deshalb müssen die beiden
 # Supabase-Werte als Repository-Secrets hinterlegt sein. Fehlen sie, baut die
 # App trotzdem, läuft dann aber im lokalen Modus (Daten nur im Browser).
+#
+# Seit dem Umzug auf Cloudflare Pages (siehe docs/DEPLOY.md) ist die
+# Veröffentlichung hier der Rückfallweg, nicht mehr der Hauptweg. Der Bau
+# dagegen bleibt für jeden Branch wichtig: er ist der Nachweis, dass Typen und
+# Bündel stimmen, bevor irgendwo etwas ausgeliefert wird.
 name: Pages
 
 on:
+  # Alle Branches, nicht nur zwei namentlich genannte. Vorher stand hier eine
+  # Liste, und ein Push auf einen dritten Branch lief still gar nicht durch die
+  # Prüfung.
   push:
-    branches: [main, claude/personal-jarvis-assistant-1c9fye]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -47,11 +55,16 @@ jobs:
         run: npm run build
 
       # GitHub Pages kennt keine Umleitungen: ohne diese Kopie liefert ein
-      # direkter Aufruf von /Jarvis/habits einen 404 statt der App.
+      # direkter Aufruf von /Jarvis/habits einen 404 statt der App. Auf
+      # Cloudflare erledigt das public/_redirects richtig, mit Status 200 statt
+      # einer Fehlerseite, die vorgibt die App zu sein.
       - name: Tiefe Links ermöglichen
         run: cp dist/index.html dist/404.html
 
+      # Nur hochladen, was auch veröffentlicht wird. Auf einem Branch endet der
+      # Lauf hier — mit grünem Bau und ohne den Anschein, ausgeliefert zu haben.
       - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
         with:
           path: dist
 
