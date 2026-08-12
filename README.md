@@ -1,206 +1,57 @@
-# JARVIS
+# Anonyme TikTok-Persona -- Content-Pipeline
 
-Persönliches Cockpit — Habits, Aufgaben, Notizen, Lernzeit, Uni, Ziele, Sport und Journal
-in einer Ansicht. Web-App, auf dem Handy als eigenständige App installierbar.
+Automatisierte Pipeline zur Erstellung von "faceless" TikTok-Videos (Voiceover
++ B-Roll + Untertitel) fuer eine fiktive, anonyme Persona. Kein echtes Gesicht,
+keine echte Stimme -- vollstaendig KI-generiert, auf minimalem Budget
+(kostenlose/guenstige Tools).
 
-![Ring-Hub](public/icon-192.png)
+Details zur Persona (Ton, Themen, Grenzen) stehen in
+[`persona/persona_bible.md`](persona/persona_bible.md) -- **das ist der
+wichtigste Ort im Repo**, weil er den Ton aller generierten Videos steuert.
 
-## Was die App kann
+## Tech-Stack
 
-Im Zentrum steht der **Ring-Hub**: drei ineinanderliegende Bögen über einem rotierenden
-Gitterglobus zeigen, wie der Tag steht.
+| Schritt | Tool | Kosten |
+|---|---|---|
+| Skript-Generierung | OpenRouter (LLM) | ~0 (guenstige/freie Modelle) |
+| Stimme | [edge-tts](https://github.com/rany2/edge-tts) | kostenlos |
+| B-Roll | [Pexels API](https://www.pexels.com/api/) | kostenlos |
+| Video-Zusammenbau + Untertitel | moviepy / ffmpeg (lokal) | kostenlos |
 
-| Bogen | Bedeutung |
-|---|---|
-| außen, cyan | Tagesziel gesamt |
-| Mitte, grün | Habits heute erledigt |
-| innen, violett | Lernzeit gegen das Tagesziel |
+Upload auf TikTok ist **nicht** automatisiert -- die Pipeline erzeugt fertige
+`.mp4`-Dateien, die manuell hochgeladen werden.
 
-Das Tagesziel wird in `src/lib/cockpit.ts` berechnet und nirgends sonst:
-
-```
-Tag = 0,4 · Habits + 0,3 · Aufgaben + 0,3 · Lernzeit
-```
-
-Habits abhaken oder den Timer starten bewegt Bögen, Zahl, Legende und die leuchtenden Knoten
-auf dem Globus — der Hub ist keine Dekoration.
-
-**Module:** Habits · Tasks & Notes · Journal · Study-Timer · Uni · Goals · Sport · Auswertung.
-Dazu ein **Daily Briefing** in einem Satz, aktuell aus festen Regeln erzeugt
-(`src/features/briefing/Briefing.tsx`) — später übernimmt dort ein KI-Modell.
-
-## Starten
+## Setup
 
 ```bash
-npm install
-npm run dev
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env
+# .env mit OPENROUTER_API_KEY und PEXELS_API_KEY befuellen
 ```
 
-Beim ersten Start wird die Datenbank mit Beispieldaten gefüllt, damit das Cockpit nicht
-leer dasteht. Alles davon lässt sich in den Modulen ändern oder löschen.
+`ffmpeg` muss zusaetzlich systemweit installiert sein (wird von moviepy
+benoetigt).
+
+## Nutzung
 
 ```bash
-npm run build       # Produktionsbau
-npm run typecheck   # nur Typen prüfen
+python -m pipeline.main "Warum fuehlen sich so viele Studierende gerade orientierungslos?" de "studying,laptop,city walk"
 ```
 
-## Wo die Daten liegen
+Ergebnis landet in `content/output/`:
+- `<slug>-<sprache>.mp3` -- Voiceover
+- `<slug>-<sprache>-broll/` -- heruntergeladene Stock-Clips
+- `<slug>-<sprache>.mp4` -- fertiges Video
 
-Die Datenschicht ist ein Vertrag mit zwei Austauschbaren Umsetzungen:
+Das generierte Skript wird zusaetzlich in `content/scripts/` als `.txt`
+abgelegt (zur Kontrolle/Archivierung).
 
-```
-src/lib/data/types.ts      der Vertrag — nur den kennen die Module
-src/lib/data/local.ts      IndexedDB über Dexie  (aktiv, solange kein Supabase konfiguriert)
-src/lib/data/supabase.ts   dieselbe Schnittstelle gegen Supabase
-src/lib/data/index.ts      wählt anhand der Umgebungsvariablen aus
-```
+## Status
 
-Ohne `.env.local` läuft alles lokal — praktisch zum Ausprobieren, aber Handy und Laptop
-haben dann getrennte Daten. Lade unter *Einstellungen → Daten* regelmäßig eine Sicherung
-herunter; dieselbe Datei ist zugleich der Umzugskoffer.
-
-### Supabase einschalten
-
-Das Schema ist bereits eingespielt (Projekt `PrivateApp`, Region `eu-west-1`).
-Es liegt dort neben einer fremden Tabelle `dashboard_state`, die unberührt bleibt —
-ein eigenes Projekt ging nicht, weil der kostenlose Tarif zwei aktive Projekte erlaubt
-und beide belegt waren.
-
-1. `.env.local` anlegen (Werte stehen im Supabase-Dashboard unter *Project Settings → API*):
-   ```
-   VITE_SUPABASE_URL=…
-   VITE_SUPABASE_ANON_KEY=…
-   ```
-2. Neu starten → es erscheint der Anmeldebildschirm: E-Mail und Passwort.
-   Beim ersten Mal *Noch kein Konto?* → Konto anlegen (mindestens 8 Zeichen).
-3. Unter *Einstellungen → Daten* die lokale Sicherung einlesen.
-
-Für ein frisches Projekt stattdessen `supabase/migrations/0001_schema.sql` im SQL-Editor
-ausführen — die Datei ist auf dem eingespielten Stand.
-
-Angemeldet wird mit E-Mail und Passwort (`signInWithPassword`). Kein Magic Link: der Umweg
-übers Postfach bei jeder Anmeldung war lästiger als ein Passwort. Supabase speichert nur den
-Hash, nie das Passwort selbst.
-
-Nur Adressen aus der Tabelle `allowed_emails` können ein Konto anlegen — ein Trigger auf
-`auth.users` bricht sonst ab. Geprüft: eine fremde Adresse wird abgewiesen, die
-freigeschaltete kommt durch und bekommt ihr Profil. Zusammen mit Row Level Security
-(13 von 13 Tabellen) bleibt die App auch unter öffentlicher URL dicht; der `anon key`
-ist dafür ausgelegt, öffentlich zu sein.
-
-Eine weitere Adresse freischalten:
-
-```sql
-insert into public.allowed_emails (email) values ('…') on conflict do nothing;
-```
-
-## Veröffentlichen
-
-### GitHub Pages (eingerichtet)
-
-`.github/workflows/pages.yml` baut bei jedem Push auf `main` oder den Arbeitsbranch
-und veröffentlicht nach GitHub Pages. Einmalig nötig:
-
-1. Repo auf **öffentlich** stellen (Pages ist bei privaten Repos kostenpflichtig)
-2. *Settings → Pages → Source:* **GitHub Actions**
-3. *Settings → Secrets and variables → Actions* → zwei Secrets anlegen:
-   `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY`
-4. In Supabase unter *Authentication → URL Configuration* die Pages-Adresse als
-   Site-URL und Redirect-URL eintragen — sonst führt der Magic Link ins Leere
-
-Die Seite liegt danach unter `https://<konto>.github.io/Jarvis/`.
-
-Der Unterpfad ist der Grund für `BASE_PATH` in `vite.config.ts`: GitHub Pages liefert
-Projektseiten nicht unter `/` aus. Lokal bleibt es `/`, `npm run dev` ändert sich nicht.
-`404.html` ist eine Kopie von `index.html` — ohne sie ergibt ein direkter Aufruf von
-`/Jarvis/habits` einen 404, weil Pages keine Umleitungen kennt.
-
-### Vercel (Alternative)
-
-`vercel.json` liegt ebenfalls bereit. Repo mit dem Vercel-Konto verbinden, dieselben zwei
-Variablen eintragen — dort entfällt der Unterpfad, die App liegt direkt auf `/`.
-
-Ohne die Variablen läuft die App im lokalen Modus, ist also auch ohne Backend deploybar.
-
-## Aufbau
-
-```
-src/styles/         tokens.css (Farben, Schrift, Radien) · hud.css · app.css
-src/components/hud/ GlassTile, ArcHub, ArcGauge, Pill, DotRow, DotMap, Sparkline …
-src/features/       briefing · habits · study (Timer als Kontext, läuft beim Wechsel weiter)
-src/pages/          eine Datei je Modulansicht
-src/lib/            data (Adapter) · cockpit (abgeleitete Werte) · date · store
-supabase/migrations/
-```
-
-Alle Diagramme sind eigene SVG- und Canvas-Komponenten — bewusst keine Chart-Library.
-
-## Warum Änderungen sofort greifen
-
-Jede Änderung landet erst im Zwischenspeicher und wird danach geschrieben
-(`onMutate` in `src/lib/store.ts`). Vorher wartete die Oberfläche auf zwei
-Rundreisen — Schreiben und Neuladen — und stand bis dahin still. Lokal fiel das
-nie auf, weil IndexedDB sofort antwortet; über Mobilfunk fühlte es sich wie ein
-Hänger an.
-
-Gemessen mit künstlich auf 1,5 s verzögertem Schreibvorgang: **Haken sichtbar
-nach 13 ms.** Schlägt das Schreiben fehl, springt der alte Stand zurück und der
-Grund erscheint als Streifen oben (`src/components/ErrorBar.tsx`) — vorher
-verpuffte ein Fehlschlag lautlos, was ebenfalls wie ein Hänger wirkte.
-
-Aus demselben Grund schreibt die Erstbefüllung gebündelt (`putMany`): rund 420
-Zeilen einzeln wären ebenso viele Netzanfragen und hätten den ersten Login
-minutenlang blockiert.
-
-## Warum kein `backdrop-filter`
-
-Die Glasoptik kam ursprünglich von `backdrop-filter: blur()` auf jeder Kachel, Pille,
-der Kopfzeile und der Navigation. Gemessen mit vierfach gedrosselter CPU kostete das
-mehr als die Hälfte der Bildrate:
-
-| | fps |
-|---|---|
-| mit `backdrop-filter` | 24,8 |
-| ohne Ambient-Ebene | 34,5 |
-| ohne Globus-Canvas | 27,7 |
-| **ohne `backdrop-filter`** | **59,3** |
-
-Sichtbar war er praktisch nicht — hinter den Kacheln liegt fast schwarzer Grund, da gibt
-es nichts zu verwischen. Die Glasoptik trägt der Verlauf plus der Lichtschimmer an der
-Oberkante. Falls jemand ihn wieder einbauen möchte: erst messen.
-
-Der Globus zeichnet aus demselben Grund gebündelt (fünf Pfade nach Tiefenstufen statt
-660 Einzelstriche), nutzt Halo-Kreise statt `shadowBlur` und malt nur etwa 30×/s —
-die Drehung ist zu langsam, als dass man den Unterschied sähe.
-
-## Schriften
-
-Jura, DM Mono und Outfit liegen unter `public/fonts/` und stehen unter der
-[SIL Open Font License](https://scripts.sil.org/OFL); die Lizenztexte liegen daneben.
-
-## Auf iPhone und Mac installieren
-
-**iPhone:** Seite in Safari öffnen → Teilen → *Zum Home-Bildschirm*.
-**Mac:** Safari 17+ → Ablage → *Zum Dock hinzufügen*. Chrome/Edge: Installieren-Symbol in der Adressleiste.
-
-iOS liest das Web-Manifest nur teilweise; die Angaben dafür stehen deshalb zusätzlich als
-Apple-Meta-Tags in `index.html`:
-
-- `apple-touch-icon` — **ohne dieses Symbol nimmt iOS einen Screenshot der Seite als App-Icon**
-- `apple-mobile-web-app-status-bar-style: black-translucent` — die Statusleiste übernimmt den
-  dunklen Grund, statt als heller Balken darüber zu liegen
-- 16 `apple-touch-startup-image` für acht iPhone-Größen, hoch und quer — ohne sie zeigt iOS
-  beim Öffnen eine weiße Fläche, was bei einer durchweg dunklen App unangenehm auffällt
-
-Weil die Statusleiste über dem Inhalt liegt, rechnet das CSS die Sicherheitsabstände ein
-(`env(safe-area-inset-*)` in `.shell` und `.tabbar`). Auf allen anderen Geräten sind diese
-Werte 0, das Layout ändert sich dort also nicht.
-
-Eingabefelder sind auf Fingerbedienung 16 px groß: **unterhalb davon zoomt Safari beim
-Antippen in das Feld hinein und kommt nicht von allein zurück.**
-
-## Bedienung
-
-- **Reduzierte Bewegung** im Betriebssystem schaltet alle Animationen ab und zeigt sofort
-  die Endwerte — unabhängig vom Ambient-Schalter.
-- Ton ist standardmäßig aus und lässt sich in den Einstellungen zuschalten.
+Entwurf/MVP -- Persona-Bibel ist noch nicht final (siehe offene Punkte dort).
+Untertitel-Timing ist aktuell eine Schaetzung nach Zeichenanzahl pro Satz,
+nicht per Spracherkennung synchronisiert -- fuer echtes Wort-Timing kann
+spaeter z.B. `faster-whisper` ergaenzt werden.
