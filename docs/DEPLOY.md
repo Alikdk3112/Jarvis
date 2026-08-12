@@ -1,5 +1,70 @@
 # Ausliefern
 
+## Der schnelle Weg: gar kein CI
+
+Über GitHub Actions dauert eine Änderung bis aufs Telefon rund zwei Minuten —
+Push, Runner anwerfen, `npm ci`, bauen, hochladen, CDN. Für eine Sache, die man
+sehen will, ist das zu lang.
+
+Es geht direkt, ohne CI:
+
+```bash
+npm run deploy
+```
+
+Baut lokal (rund zwei Sekunden) und schiebt `dist/` per Wrangler direkt zu
+Cloudflare. **Live in etwa fünfzehn Sekunden.** Kein Runner, kein Warten,
+keine Branch-Regel, die dazwischenkommt.
+
+Einmalig davor: `npx wrangler@4 login` (öffnet den Browser) und in Cloudflare
+ein Pages-Projekt namens `jarvis` anlegen — oder den Namen im Skript in
+`package.json` an dein Projekt anpassen. Danach nie wieder.
+
+`npm run deploy:vorschau` schiebt dasselbe auf eine Vorschau-URL, ohne die
+Produktionsadresse anzufassen. Gut, wenn du etwas am Handy ansehen willst, das
+noch nicht gelten soll.
+
+## Der sofortige Weg: das Handy am Entwicklungsserver
+
+Zum Ausprobieren braucht es überhaupt keine Auslieferung:
+
+```bash
+npm run dev:handy
+```
+
+Vite bindet dann an alle Netzwerkadressen und schreibt die Adresse im
+lokalen Netz in die Konsole, etwa `http://192.168.1.42:5173/`. Die am Handy
+im Safari öffnen — Handy und Rechner im gleichen WLAN. Eine Änderung im Editor
+ist **unter einer Sekunde** am Telefon zu sehen, ohne Neuladen.
+
+Zwei Dinge dazu:
+
+- Anmeldung mit E-Mail und Passwort funktioniert so. Was *nicht* funktioniert,
+  sind die Wege über einen Link aus einer Mail (Registrierung bestätigen,
+  Passwort zurücksetzen) — die zeigen auf die veröffentlichte Adresse, nicht
+  auf dein WLAN. Für alles andere reicht es.
+- Es ist der Entwicklungsserver: unkomprimiert, ohne Service Worker, in
+  Einzeldateien statt Bündeln. Zum Aussehen und Bedienen taugt das, zum
+  **Geschwindigkeit messen nicht** — dafür `npm run build` und
+  `npm run preview -- --host`.
+
+Wenn Handy und Rechner nicht im gleichen Netz sind, legt
+`npx cloudflared tunnel --url http://localhost:5173` einen Tunnel mit
+öffentlicher Adresse.
+
+## Was welchen Weg wann verdient
+
+| Was du willst | Weg | Dauer |
+|---|---|---|
+| Etwas ausprobieren, oft ändern | `npm run dev:handy` | unter 1 s je Änderung |
+| Einen Stand am Handy ansehen | `npm run deploy:vorschau` | ~15 s |
+| Etwas gilt ab jetzt | `npm run deploy` | ~15 s |
+| Nachvollziehbar aus dem Repo | Push auf `main`, CI | ~2 min |
+
+Der CI-Weg bleibt, und das ist Absicht: er ist der Nachweis, dass der Stand im
+Repo für sich baut, unabhängig von irgendetwas auf deinem Rechner. Nur ist er
+nicht mehr der einzige Weg.
+
 ## Warum weg von GitHub Pages
 
 GitHub Pages ist nicht langsam. Es hat aber drei Fallen, und in alle drei sind
