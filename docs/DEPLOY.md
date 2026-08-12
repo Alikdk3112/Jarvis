@@ -181,6 +181,48 @@ Beide Cloudflare-Dateien stören auf GitHub Pages nicht — sie werden dort
 schlicht ignoriert. Solange beides parallel läuft, ist das unproblematisch;
 Schritt 5 räumt es auf.
 
+## Warum eine neue Fassung früher drei Öffnungen brauchte
+
+Das war der eigentliche Grund, warum am Telefon wochenlang der alte Stand lief
+— nicht nur der gescheiterte Deploy. Nachgemessen mit einem Server, der die
+Cache-Header von GitHub Pages nachbildet: alte Fassung öffnen, Dateien gegen
+die neue tauschen, dann zählen, welches Bündel die Seite wirklich ausführt.
+
+```
+vorher                          nachher
+1. Öffnen → alt                 1. Öffnen → alt   (Worker richtet sich ein)
+2. Öffnen → ALT   ← das Problem    Tausch
+3. Öffnen → neu                 2. Öffnen → NEU   (lädt sich einmal selbst neu)
+```
+
+Die Ursache: Der aktive Service Worker beantwortet den Aufruf aus seinem
+Vorrat, also mit der alten `index.html` und damit dem alten Bündel. Parallel
+holt der Browser die neue `sw.js` und aktiviert sie. Nur läuft die Seite
+längst — und **niemand lädt sie neu**. Erst beim nächsten Öffnen liefert der
+neue Worker seinen neuen Vorrat aus.
+
+Auf einem Telefon, das man morgens einmal aufmacht, ist die neue Fassung damit
+übermorgen da. Und wer zwischendurch nicht lange genug wartet, sieht sie nie:
+Pages schickt auf `sw.js` zehn Minuten Cache, dann wird nicht einmal nach einer
+neuen gefragt.
+
+Behoben in `src/lib/sw.ts`: Übernimmt ein neuer Worker die Kontrolle, wird
+genau einmal neu geladen. Zwei Fallen dabei, beide abgesichert und beide
+gemessen:
+
+- **Der Erstbesuch darf nicht neu laden.** Dort übernimmt der Worker zum
+  ersten Mal, der Inhalt ist aber frisch vom Server. Deshalb der Riegel auf
+  „gab es beim Start schon einen Controller".
+- **Es darf keine Schleife werden.** Gemessen: Erstbesuch eine Ladung, vier
+  ruhige Öffnungen je eine, neue Fassung zwei (eine plus das Neuladen), danach
+  wieder eine.
+
+Dazu stehen `skipWaiting` und `clientsClaim` jetzt ausdrücklich in der
+Workbox-Konfiguration. Das Plugin leitete beide daraus ab, ob es die Anmeldung
+selbst einhängt — als wir sie übernahmen, stellte es still auf „wartet auf
+Zuruf" um, und der neue Worker übernahm dann **überhaupt nie mehr**. Solche
+Werte gehören hingeschrieben, nicht gefolgert.
+
 ## Woran man erkennt, welcher Bau läuft
 
 *Einstellungen → Profil* zeigt **Fassung** (kurze Commit-Kennung) und

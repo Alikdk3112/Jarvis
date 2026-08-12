@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from './App'
 import { seedIfEmpty } from './lib/seed'
 import { isLocalMode } from './lib/data'
+import { registerServiceWorker } from './lib/sw'
 
 import './styles/tokens.css'
 import './styles/hud.css'
@@ -29,7 +30,11 @@ const ready = isLocalMode
   ? seedIfEmpty().catch((err) => console.error('Erstbefüllung fehlgeschlagen:', err))
   : Promise.resolve()
 
+/* Erst die App zeigen, dann den Service Worker anmelden. Andersherum kann das
+   Anmelden das erste Bild verzögern, und das ist genau der Moment, in dem
+   niemand warten will. */
 ready.finally(() => {
+    registerServiceWorker()
     createRoot(document.getElementById('root') as HTMLElement).render(
       <StrictMode>
         <QueryClientProvider client={queryClient}>

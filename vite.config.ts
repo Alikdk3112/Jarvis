@@ -34,6 +34,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      /* Die Anmeldung machen wir selbst, in src/lib/sw.ts.
+         Das eingehängte Schnipsel ruft nur `register()` und lädt die Seite
+         nicht neu, wenn ein neuer Worker übernimmt — gemessen brauchte eine
+         neue Fassung damit DREI Öffnungen, bis sie zu sehen war. Ohne dieses
+         `injectRegister: false` liefen beide Anmeldungen parallel. */
+      injectRegister: false,
       // Die Schrift liegt unter src/ und wandert damit als gehashtes Asset
       // durch den Bau; globPatterns unten fängt sie. Der Lizenztext bleibt in
       // public/fonts/ liegen und muss mit ausgeliefert, aber nicht
@@ -72,6 +78,21 @@ export default defineConfig({
 
            Ebenso die 512er-Kachel: die braucht das Betriebssystem beim
            Installieren, nicht die laufende App. */
+        /* Beides ausdrücklich, nicht als Nebenwirkung.
+           Das Plugin leitet diese zwei aus `registerType` UND daraus ab, ob es
+           die Anmeldung selbst einhängt. Weil wir sie selbst machen (siehe
+           injectRegister oben), stellte es den Worker auf „wartet auf Zuruf"
+           um: `skipWaiting()` nur noch auf Nachricht, `clientsClaim()` gar
+           nicht. Gemessene Folge — der neue Worker blieb in `waiting` stehen
+           und übernahm überhaupt nie mehr.
+
+           skipWaiting: der neue Worker ersetzt den alten sofort, statt bis zum
+           Schliessen aller Seiten zu warten.
+           clientsClaim: er übernimmt dabei auch die schon offene Seite. Erst
+           dadurch feuert `controllerchange`, und erst daran hängt in
+           src/lib/sw.ts das einmalige Neuladen. */
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,woff2,svg,webmanifest}'],
         globIgnores: ['**/splash-*.png', '**/icon-512.png'],
         // Größte Einzeldatei ist damit das JS-Bündel; 2 MB reichen mit Rand.
