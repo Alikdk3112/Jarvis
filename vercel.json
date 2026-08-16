@@ -1,13 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "rewrites": [{ "source": "/((?!assets/|fonts/|.*\\..*).*)", "destination": "/index.html" }],
-  "headers": [
+  "crons": [
     {
-      "source": "/fonts/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "path": "/api/finance/snapshot",
+      "schedule": "0 5 * * *"
     }
   ]
 }

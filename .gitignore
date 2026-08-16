@@ -8,9 +8,15 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
+
+# Next.js
+.next
+out
+build
+next-env.d.ts.bak
 *.local
+.vercel
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
@@ -23,6 +29,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# lokale Zugangsdaten
+# local credentials
+.env
 .env.local
 .env*.local

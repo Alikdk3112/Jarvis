@@ -1,206 +1,142 @@
-# JARVIS
+# Personal OS
 
-Persönliches Cockpit — Habits, Aufgaben, Notizen, Lernzeit, Uni, Ziele, Sport und Journal
-in einer Ansicht. Web-App, auf dem Handy als eigenständige App installierbar.
+An AI-native personal dashboard: capture by voice from anywhere, let AI route it into
+the right place, and see the state of your day — tasks, habits, nutrition, finance,
+calendar, journal — in one view.
 
-![Ring-Hub](public/icon-192.png)
+Built on Next.js 15 (App Router) + Supabase (Postgres + pgvector) + Anthropic Claude
+(primary) / OpenAI (fallback + Whisper + embeddings), deployed on Vercel.
 
-## Was die App kann
+## What's here
 
-Im Zentrum steht der **Ring-Hub**: drei ineinanderliegende Bögen über einem rotierenden
-Gitterglobus zeigen, wie der Tag steht.
+- **Home** — a 3-column dashboard: Operator, Finance Pulse, Key Blockers, Session,
+  Habit Tracker, Calendar, Nutrition.
+- **CRM** — tasks across four urgency tiers, in Kanban / Smart (natural-language
+  search) / Category views.
+- **Brain** — semantic search + an "ask my OS" Q&A over everything you've ever
+  captured.
+- **Finance** — Finance Pulse in full: AI reads a messy Google Sheet and figures out
+  net worth without you labeling anything.
+- **Journal** — voice/text captures classified as journal entries, plus weekly/monthly
+  goals.
+- **Health** — a 30-day nutrition log.
+- **Capture pipeline** — a Telegram bot (or the floating capture box on the
+  dashboard) feeds voice/text through Whisper + Claude classification into the right
+  table, with a memory chunk embedded for later recall.
+- **Demo mode** — toggle in the top rail; every card swaps to fake data, nothing
+  touches the real DB.
 
-| Bogen | Bedeutung |
-|---|---|
-| außen, cyan | Tagesziel gesamt |
-| Mitte, grün | Habits heute erledigt |
-| innen, violett | Lernzeit gegen das Tagesziel |
-
-Das Tagesziel wird in `src/lib/cockpit.ts` berechnet und nirgends sonst:
-
-```
-Tag = 0,4 · Habits + 0,3 · Aufgaben + 0,3 · Lernzeit
-```
-
-Habits abhaken oder den Timer starten bewegt Bögen, Zahl, Legende und die leuchtenden Knoten
-auf dem Globus — der Hub ist keine Dekoration.
-
-**Module:** Habits · Tasks & Notes · Journal · Study-Timer · Uni · Goals · Sport · Auswertung.
-Dazu ein **Daily Briefing** in einem Satz, aktuell aus festen Regeln erzeugt
-(`src/features/briefing/Briefing.tsx`) — später übernimmt dort ein KI-Modell.
-
-## Starten
+## Local development
 
 ```bash
 npm install
+cp .env.example .env.local   # fill in what you have; see below for what's required
 npm run dev
+npm run typecheck
 ```
 
-Beim ersten Start wird die Datenbank mit Beispieldaten gefüllt, damit das Cockpit nicht
-leer dasteht. Alles davon lässt sich in den Modulen ändern oder löschen.
+Without `SUPABASE_SERVICE_ROLE_KEY` / `NEXT_PUBLIC_SUPABASE_URL` set, most API routes
+will error — either set them up (see below) or use Demo mode to browse the UI with
+fake data.
+
+## Setting up Supabase
+
+1. Create a project at [supabase.com](https://supabase.com) (free tier is fine).
+2. Run `supabase/migrations/0001_init.sql` in the SQL editor. It enables `pgvector`,
+   creates every table, an ivfflat index for memory search, and enables RLS
+   deny-all (the app talks to Postgres exclusively through the service-role key,
+   which bypasses RLS — there's no end-user Postgres auth in this single-user build).
+3. From *Project Settings → API*, copy the Project URL and the service role key into
+   `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`.
+
+## Setting up the auth gate
+
+Single password, HMAC-signed cookie — no OAuth needed for a single-user app.
 
 ```bash
-npm run build       # Produktionsbau
-npm run typecheck   # nur Typen prüfen
+openssl rand -hex 32   # → AUTH_SECRET
 ```
 
-## Wo die Daten liegen
+Pick any memorable string for `DASHBOARD_PASSWORD`. Optionally set `API_SECRET` (any
+random string) so scripts/cron jobs can hit API routes with an `x-api-secret` header
+instead of a session cookie.
 
-Die Datenschicht ist ein Vertrag mit zwei Austauschbaren Umsetzungen:
+## Setting up the Telegram capture bot
 
-```
-src/lib/data/types.ts      der Vertrag — nur den kennen die Module
-src/lib/data/local.ts      IndexedDB über Dexie  (aktiv, solange kein Supabase konfiguriert)
-src/lib/data/supabase.ts   dieselbe Schnittstelle gegen Supabase
-src/lib/data/index.ts      wählt anhand der Umgebungsvariablen aus
-```
-
-Ohne `.env.local` läuft alles lokal — praktisch zum Ausprobieren, aber Handy und Laptop
-haben dann getrennte Daten. Lade unter *Einstellungen → Daten* regelmäßig eine Sicherung
-herunter; dieselbe Datei ist zugleich der Umzugskoffer.
-
-### Supabase einschalten
-
-Das Schema ist bereits eingespielt (Projekt `PrivateApp`, Region `eu-west-1`).
-Es liegt dort neben einer fremden Tabelle `dashboard_state`, die unberührt bleibt —
-ein eigenes Projekt ging nicht, weil der kostenlose Tarif zwei aktive Projekte erlaubt
-und beide belegt waren.
-
-1. `.env.local` anlegen (Werte stehen im Supabase-Dashboard unter *Project Settings → API*):
+1. In Telegram, message **@BotFather** → `/newbot`. Save the token as
+   `TELEGRAM_BOT_TOKEN`.
+2. `openssl rand -hex 16` → `TELEGRAM_WEBHOOK_SECRET`.
+3. Message **@userinfobot** to get your numeric user id → `TELEGRAM_USER_ID` (the bot
+   only listens to this id).
+4. After deploying, register the webhook:
+   ```bash
+   curl -F "url=https://your-app.vercel.app/api/telegram/webhook" \
+        -F "secret_token=$TELEGRAM_WEBHOOK_SECRET" \
+        "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"
    ```
-   VITE_SUPABASE_URL=…
-   VITE_SUPABASE_ANON_KEY=…
-   ```
-2. Neu starten → es erscheint der Anmeldebildschirm: E-Mail und Passwort.
-   Beim ersten Mal *Noch kein Konto?* → Konto anlegen (mindestens 8 Zeichen).
-3. Unter *Einstellungen → Daten* die lokale Sicherung einlesen.
 
-Für ein frisches Projekt stattdessen `supabase/migrations/0001_schema.sql` im SQL-Editor
-ausführen — die Datei ist auf dem eingespielten Stand.
+No Telegram? Skip it — the floating capture box on the dashboard posts to the same
+`/api/capture` pipeline.
 
-Angemeldet wird mit E-Mail und Passwort (`signInWithPassword`). Kein Magic Link: der Umweg
-übers Postfach bei jeder Anmeldung war lästiger als ein Passwort. Supabase speichert nur den
-Hash, nie das Passwort selbst.
+## Setting up Finance Pulse (Google Sheets)
 
-Nur Adressen aus der Tabelle `allowed_emails` können ein Konto anlegen — ein Trigger auf
-`auth.users` bricht sonst ab. Geprüft: eine fremde Adresse wird abgewiesen, die
-freigeschaltete kommt durch und bekommt ihr Profil. Zusammen mit Row Level Security
-(13 von 13 Tabellen) bleibt die App auch unter öffentlicher URL dicht; der `anon key`
-ist dafür ausgelegt, öffentlich zu sein.
+Never use Google's "publish to web" — the sheet stays fully private with a service
+account instead.
 
-Eine weitere Adresse freischalten:
+1. [console.cloud.google.com/projectcreate](https://console.cloud.google.com/projectcreate)
+   → create a project → enable the **Drive API**.
+2. *IAM → Service Accounts* → create one → generate a JSON key.
+3. Open your finance Google Sheet → Share → paste the service account email
+   (ends in `@...iam.gserviceaccount.com`) → Viewer.
+4. Set `GOOGLE_SHEETS_FINANCE_ID` (the id between `/d/` and `/edit` in the sheet URL),
+   `GOOGLE_SERVICE_ACCOUNT_EMAIL`, and `GOOGLE_SERVICE_ACCOUNT_KEY` (the `private_key`
+   field from the JSON — keep the `\n` escapes, the app unescapes them at runtime).
 
-```sql
-insert into public.allowed_emails (email) values ('…') on conflict do nothing;
+Page loads never trigger the AI extraction — only the card's manual refresh button
+or the daily Vercel cron does (see `vercel.json`), so a page full of visitors can't
+burn your API budget.
+
+## Setting up the calendar
+
+Google Calendar → Settings → your calendar → *Integrate calendar* → **Secret address
+in iCal format**. Set that as `GOOGLE_CALENDAR_ICAL_URL`. No OAuth required.
+
+## Deploying to Vercel
+
+```bash
+npm i -g vercel
+vercel link
+vercel --prod
 ```
 
-## Veröffentlichen
+Push every variable from `.env.example` with `vercel env add <NAME> production`, then
+redeploy. `vercel.json` already wires the daily finance cron — Vercel sends the
+`Authorization: Bearer $CRON_SECRET` header automatically, so set `CRON_SECRET` to
+any random value.
 
-### GitHub Pages (eingerichtet)
+## Architecture notes
 
-`.github/workflows/pages.yml` baut bei jedem Push auf `main` oder den Arbeitsbranch
-und veröffentlicht nach GitHub Pages. Einmalig nötig:
+- **Single user, forward-compatible with multi-user.** Every table carries `user_id`
+  (defaults to `USER_ID` env var, a plain string, not a Postgres auth uid). Going
+  multi-user later means switching that to `auth.uid()` and adding real RLS policies
+  — the schema and API shapes don't need to change.
+- **RLS is deny-all.** Every read/write goes through the service-role key from a
+  trusted server route, gated by the app's own HMAC-cookie auth — not Postgres auth.
+- **Memory is additive.** Every task and capture gets embedded into `memory_chunks`
+  (OpenAI `text-embedding-3-small`) best-effort — if `OPENAI_API_KEY` isn't set, the
+  write that triggered it still succeeds; memory search on the Brain tab just comes
+  back empty until it is.
+- **Classifier fallback chain.** Claude → OpenAI → regex. A capture always gets
+  filed somewhere, even if both LLM calls fail.
+- **Local-clock day boundaries.** Habits and nutrition reset at midnight in *your*
+  clock (`lib/localDate.ts`), not the server's UTC — see the "Habits reset at 4am"
+  class of bug this avoids.
+- **iCal, not node-ical.** `ical.js` (Mozilla's pure-JS parser) — `node-ical`'s
+  BigInt usage gets mangled by Next.js's production bundler.
 
-1. Repo auf **öffentlich** stellen (Pages ist bei privaten Repos kostenpflichtig)
-2. *Settings → Pages → Source:* **GitHub Actions**
-3. *Settings → Secrets and variables → Actions* → zwei Secrets anlegen:
-   `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY`
-4. In Supabase unter *Authentication → URL Configuration* die Pages-Adresse als
-   Site-URL und Redirect-URL eintragen — sonst führt der Magic Link ins Leere
+## What's next
 
-Die Seite liegt danach unter `https://<konto>.github.io/Jarvis/`.
-
-Der Unterpfad ist der Grund für `BASE_PATH` in `vite.config.ts`: GitHub Pages liefert
-Projektseiten nicht unter `/` aus. Lokal bleibt es `/`, `npm run dev` ändert sich nicht.
-`404.html` ist eine Kopie von `index.html` — ohne sie ergibt ein direkter Aufruf von
-`/Jarvis/habits` einen 404, weil Pages keine Umleitungen kennt.
-
-### Vercel (Alternative)
-
-`vercel.json` liegt ebenfalls bereit. Repo mit dem Vercel-Konto verbinden, dieselben zwei
-Variablen eintragen — dort entfällt der Unterpfad, die App liegt direkt auf `/`.
-
-Ohne die Variablen läuft die App im lokalen Modus, ist also auch ohne Backend deploybar.
-
-## Aufbau
-
-```
-src/styles/         tokens.css (Farben, Schrift, Radien) · hud.css · app.css
-src/components/hud/ GlassTile, ArcHub, ArcGauge, Pill, DotRow, DotMap, Sparkline …
-src/features/       briefing · habits · study (Timer als Kontext, läuft beim Wechsel weiter)
-src/pages/          eine Datei je Modulansicht
-src/lib/            data (Adapter) · cockpit (abgeleitete Werte) · date · store
-supabase/migrations/
-```
-
-Alle Diagramme sind eigene SVG- und Canvas-Komponenten — bewusst keine Chart-Library.
-
-## Warum Änderungen sofort greifen
-
-Jede Änderung landet erst im Zwischenspeicher und wird danach geschrieben
-(`onMutate` in `src/lib/store.ts`). Vorher wartete die Oberfläche auf zwei
-Rundreisen — Schreiben und Neuladen — und stand bis dahin still. Lokal fiel das
-nie auf, weil IndexedDB sofort antwortet; über Mobilfunk fühlte es sich wie ein
-Hänger an.
-
-Gemessen mit künstlich auf 1,5 s verzögertem Schreibvorgang: **Haken sichtbar
-nach 13 ms.** Schlägt das Schreiben fehl, springt der alte Stand zurück und der
-Grund erscheint als Streifen oben (`src/components/ErrorBar.tsx`) — vorher
-verpuffte ein Fehlschlag lautlos, was ebenfalls wie ein Hänger wirkte.
-
-Aus demselben Grund schreibt die Erstbefüllung gebündelt (`putMany`): rund 420
-Zeilen einzeln wären ebenso viele Netzanfragen und hätten den ersten Login
-minutenlang blockiert.
-
-## Warum kein `backdrop-filter`
-
-Die Glasoptik kam ursprünglich von `backdrop-filter: blur()` auf jeder Kachel, Pille,
-der Kopfzeile und der Navigation. Gemessen mit vierfach gedrosselter CPU kostete das
-mehr als die Hälfte der Bildrate:
-
-| | fps |
-|---|---|
-| mit `backdrop-filter` | 24,8 |
-| ohne Ambient-Ebene | 34,5 |
-| ohne Globus-Canvas | 27,7 |
-| **ohne `backdrop-filter`** | **59,3** |
-
-Sichtbar war er praktisch nicht — hinter den Kacheln liegt fast schwarzer Grund, da gibt
-es nichts zu verwischen. Die Glasoptik trägt der Verlauf plus der Lichtschimmer an der
-Oberkante. Falls jemand ihn wieder einbauen möchte: erst messen.
-
-Der Globus zeichnet aus demselben Grund gebündelt (fünf Pfade nach Tiefenstufen statt
-660 Einzelstriche), nutzt Halo-Kreise statt `shadowBlur` und malt nur etwa 30×/s —
-die Drehung ist zu langsam, als dass man den Unterschied sähe.
-
-## Schriften
-
-Jura, DM Mono und Outfit liegen unter `public/fonts/` und stehen unter der
-[SIL Open Font License](https://scripts.sil.org/OFL); die Lizenztexte liegen daneben.
-
-## Auf iPhone und Mac installieren
-
-**iPhone:** Seite in Safari öffnen → Teilen → *Zum Home-Bildschirm*.
-**Mac:** Safari 17+ → Ablage → *Zum Dock hinzufügen*. Chrome/Edge: Installieren-Symbol in der Adressleiste.
-
-iOS liest das Web-Manifest nur teilweise; die Angaben dafür stehen deshalb zusätzlich als
-Apple-Meta-Tags in `index.html`:
-
-- `apple-touch-icon` — **ohne dieses Symbol nimmt iOS einen Screenshot der Seite als App-Icon**
-- `apple-mobile-web-app-status-bar-style: black-translucent` — die Statusleiste übernimmt den
-  dunklen Grund, statt als heller Balken darüber zu liegen
-- 16 `apple-touch-startup-image` für acht iPhone-Größen, hoch und quer — ohne sie zeigt iOS
-  beim Öffnen eine weiße Fläche, was bei einer durchweg dunklen App unangenehm auffällt
-
-Weil die Statusleiste über dem Inhalt liegt, rechnet das CSS die Sicherheitsabstände ein
-(`env(safe-area-inset-*)` in `.shell` und `.tabbar`). Auf allen anderen Geräten sind diese
-Werte 0, das Layout ändert sich dort also nicht.
-
-Eingabefelder sind auf Fingerbedienung 16 px groß: **unterhalb davon zoomt Safari beim
-Antippen in das Feld hinein und kommt nicht von allein zurück.**
-
-## Bedienung
-
-- **Reduzierte Bewegung** im Betriebssystem schaltet alle Animationen ab und zeigt sofort
-  die Endwerte — unabhängig vom Ambient-Schalter.
-- Ton ist standardmäßig aus und lässt sich in den Einstellungen zuschalten.
+Natural extensions once this is running: a 7am Telegram morning briefing (cron +
+`sendMessage`), a voice journal routed separately from the CRM, sub-tasks via
+`parent_task_id`, bulk-select + undo in the CRM, a nightly cron-to-GitHub backup on
+top of `/api/admin/export`, and a read-only public dashboard view for a partner or VA.

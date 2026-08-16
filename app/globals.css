@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+
+  /* neutrals, darkest to lightest */
+  --ink-0: oklch(0.14 0.01 260);
+  --ink-1: oklch(0.19 0.012 260);
+  --ink-2: oklch(0.27 0.014 260);
+  --ink-3: oklch(0.46 0.014 260);
+  --ink-4: oklch(0.86 0.01 260);
+
+  /* accent */
+  --accent: oklch(0.72 0.15 200);
+  --accent-dim: oklch(0.72 0.15 200 / 0.16);
+
+  /* semantic */
+  --ok: oklch(0.75 0.16 155);
+  --warn: oklch(0.8 0.15 85);
+  --danger: oklch(0.68 0.19 25);
+
+  --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@theme inline {
+  --color-ink-0: var(--ink-0);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-accent: var(--accent);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  border-color: var(--ink-2);
+}
+
+html,
+body {
+  background: var(--ink-0);
+  color: var(--ink-4);
+  min-height: 100dvh;
+}
+
+body {
+  font-family: var(--font-display);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  background: linear-gradient(180deg, oklch(0.22 0.014 260 / 0.6), oklch(0.16 0.012 260 / 0.6));
+  border: 1px solid var(--ink-2);
+  backdrop-filter: blur(14px);
+  border-radius: 14px;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  scrollbar-width: none;
+}
