@@ -4,7 +4,7 @@ import { USER_ID } from "@/lib/config";
 
 export async function GET() {
   const { data, error } = await supabaseAdmin()
-    .from("entities")
+    .from("os_entities")
     .select("*")
     .eq("user_id", USER_ID)
     .order("name");
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!body?.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
   const { data, error } = await supabaseAdmin()
-    .from("entities")
+    .from("os_entities")
     .insert({ user_id: USER_ID, name: body.name, kind: body.kind ?? "other", metadata: body.metadata ?? {} })
     .select()
     .single();

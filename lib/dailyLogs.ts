@@ -4,7 +4,7 @@ import type { DailyLog, DailyLogNotes } from "@/lib/types";
 
 export async function getDailyLog(logDate: string): Promise<DailyLog | null> {
   const { data, error } = await supabaseAdmin()
-    .from("daily_logs")
+    .from("os_daily_logs")
     .select("*")
     .eq("user_id", USER_ID)
     .eq("log_date", logDate)
@@ -17,7 +17,7 @@ export async function getDailyLogsRange(days: number): Promise<DailyLog[]> {
   const since = new Date();
   since.setDate(since.getDate() - days);
   const { data, error } = await supabaseAdmin()
-    .from("daily_logs")
+    .from("os_daily_logs")
     .select("*")
     .eq("user_id", USER_ID)
     .gte("log_date", since.toISOString().slice(0, 10))
@@ -35,7 +35,7 @@ export async function upsertDailyLogNotes(
   const notes: DailyLogNotes = { ...(existing?.notes ?? {}), ...patch };
 
   const { data, error } = await supabaseAdmin()
-    .from("daily_logs")
+    .from("os_daily_logs")
     .upsert(
       { user_id: USER_ID, log_date: logDate, notes, updated_at: new Date().toISOString() },
       { onConflict: "user_id,log_date" },

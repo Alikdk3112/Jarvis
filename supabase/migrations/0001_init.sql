@@ -1,6 +1,9 @@
 -- ═════════════════════════════════════════════════════════════════════
 -- Personal OS — initial schema
 --
+-- Tables are prefixed `os_` because this project also hosts an older,
+-- unrelated app's tables (habits, tasks, notes, ...) that stay untouched.
+--
 -- Single-user app: every table carries user_id for forward-compatibility
 -- with multi-user mode (see README "Going further"), but access control
 -- for now is the app's HMAC-cookie auth gate, not Postgres auth. RLS is
@@ -13,7 +16,7 @@ create extension if not exists pgcrypto;
 
 -- ── Entities ─────────────────────────────────────────────────────────
 -- People, companies, projects — anything a task or capture can be routed to.
-create table if not exists public.entities (
+create table if not exists public.os_entities (
   id         uuid primary key default gen_random_uuid(),
   user_id    text not null,
   name       text not null,
@@ -24,7 +27,7 @@ create table if not exists public.entities (
 
 -- ── Raw captures ─────────────────────────────────────────────────────
 -- Every voice/text capture, before and after AI classification/routing.
-create table if not exists public.raw_captures (
+create table if not exists public.os_raw_captures (
   id             uuid primary key default gen_random_uuid(),
   user_id        text not null,
   source         text not null check (source in ('telegram', 'web')),
@@ -38,7 +41,7 @@ create table if not exists public.raw_captures (
 );
 
 -- ── Tasks ────────────────────────────────────────────────────────────
-create table if not exists public.tasks (
+create table if not exists public.os_tasks (
   id                uuid primary key default gen_random_uuid(),
   user_id           text not null,
   title             text not null,
@@ -51,19 +54,19 @@ create table if not exists public.tasks (
   tags              text[] not null default '{}',
   due_date          date,
   owner             text,
-  entity_id         uuid references public.entities (id) on delete set null,
+  entity_id         uuid references public.os_entities (id) on delete set null,
   completed_at      timestamptz,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
 
-create index if not exists tasks_user_urgency_idx on public.tasks (user_id, urgency);
-create index if not exists tasks_user_completed_idx on public.tasks (user_id, completed_at);
+create index if not exists os_tasks_user_urgency_idx on public.os_tasks (user_id, urgency);
+create index if not exists os_tasks_user_completed_idx on public.os_tasks (user_id, completed_at);
 
 -- ── Daily logs ───────────────────────────────────────────────────────
 -- One row per user per day; `notes` holds the JSON payloads for habits,
 -- nutrition, and (on the GOALS_SENTINEL_DATE row only) goals/finance.
-create table if not exists public.daily_logs (
+create table if not exists public.os_daily_logs (
   id         uuid primary key default gen_random_uuid(),
   user_id    text not null,
   log_date   date not null,
@@ -75,7 +78,7 @@ create table if not exists public.daily_logs (
 );
 
 -- ── Memory chunks ────────────────────────────────────────────────────
-create table if not exists public.memory_chunks (
+create table if not exists public.os_memory_chunks (
   id          uuid primary key default gen_random_uuid(),
   user_id     text not null,
   source_type text not null,
@@ -85,12 +88,12 @@ create table if not exists public.memory_chunks (
   created_at  timestamptz not null default now()
 );
 
-create index if not exists memory_chunks_embedding_idx
-  on public.memory_chunks using ivfflat (embedding vector_cosine_ops)
+create index if not exists os_memory_chunks_embedding_idx
+  on public.os_memory_chunks using ivfflat (embedding vector_cosine_ops)
   with (lists = 100);
 
 -- ── Audit log ────────────────────────────────────────────────────────
-create table if not exists public.audit_log (
+create table if not exists public.os_audit_log (
   id            uuid primary key default gen_random_uuid(),
   user_id       text not null,
   action        text not null,
@@ -103,7 +106,7 @@ create table if not exists public.audit_log (
 -- ── Vector search RPC ────────────────────────────────────────────────
 -- supabase-js can't express `<=>` in .select(), so cosine search goes
 -- through this function instead.
-create or replace function public.match_memory_chunks(
+create or replace function public.match_os_memory_chunks(
   query_embedding vector(1536),
   match_user_id text,
   match_count int default 20
@@ -122,16 +125,16 @@ as $$
   select
     id, user_id, source_type, source_id, text, created_at,
     1 - (embedding <=> query_embedding) as similarity
-  from public.memory_chunks
+  from public.os_memory_chunks
   where user_id = match_user_id
   order by embedding <=> query_embedding
   limit match_count;
 $$;
 
 -- ── Row Level Security: deny-all. Service role bypasses RLS entirely. ──
-alter table public.entities enable row level security;
-alter table public.raw_captures enable row level security;
-alter table public.tasks enable row level security;
-alter table public.daily_logs enable row level security;
-alter table public.memory_chunks enable row level security;
-alter table public.audit_log enable row level security;
+alter table public.os_entities enable row level security;
+alter table public.os_raw_captures enable row level security;
+alter table public.os_tasks enable row level security;
+alter table public.os_daily_logs enable row level security;
+alter table public.os_memory_chunks enable row level security;
+alter table public.os_audit_log enable row level security;

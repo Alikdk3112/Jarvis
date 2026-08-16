@@ -6,7 +6,7 @@ import type { Task } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get("status") ?? "open";
-  let query = supabaseAdmin().from("tasks").select("*").eq("user_id", USER_ID);
+  let query = supabaseAdmin().from("os_tasks").select("*").eq("user_id", USER_ID);
   query = status === "done" ? query.not("completed_at", "is", null) : query.is("completed_at", null);
 
   const { data, error } = await query.order("priority_score", { ascending: false });
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   // New tasks insert at the top of their tier.
   const { data: top } = await admin
-    .from("tasks")
+    .from("os_tasks")
     .select("priority_score")
     .eq("user_id", USER_ID)
     .eq("urgency", urgency)
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   const priority_score = (top?.priority_score ?? 0) + 10;
 
   const { data, error } = await admin
-    .from("tasks")
+    .from("os_tasks")
     .insert({
       user_id: USER_ID,
       title: body.title,

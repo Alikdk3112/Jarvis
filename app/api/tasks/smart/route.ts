@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (!nlQuery) return NextResponse.json({ error: "query is required" }, { status: 400 });
 
   const { data: tasks, error } = await supabaseAdmin()
-    .from("tasks")
+    .from("os_tasks")
     .select("id, title, urgency, key, tags, due_date")
     .eq("user_id", USER_ID)
     .is("completed_at", null);

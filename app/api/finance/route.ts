@@ -6,7 +6,7 @@ import type { DailyLog } from "@/lib/types";
 /** Read-only — never triggers the AI pipeline. See /api/finance/snapshot for that. */
 export async function GET() {
   const { data, error } = await supabaseAdmin()
-    .from("daily_logs")
+    .from("os_daily_logs")
     .select("*")
     .eq("user_id", USER_ID)
     .not("notes->finance", "is", null)

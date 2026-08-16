@@ -14,10 +14,10 @@ export async function POST(req: NextRequest) {
 
   const [{ data: tasks }, { data: captures }] = await Promise.all([
     taskIds.length
-      ? supabaseAdmin().from("tasks").select("id, title, urgency").in("id", taskIds)
+      ? supabaseAdmin().from("os_tasks").select("id, title, urgency").in("id", taskIds)
       : Promise.resolve({ data: [] }),
     captureIds.length
-      ? supabaseAdmin().from("raw_captures").select("id, raw_text").in("id", captureIds)
+      ? supabaseAdmin().from("os_raw_captures").select("id, raw_text").in("id", captureIds)
       : Promise.resolve({ data: [] }),
   ]);
 

@@ -5,7 +5,7 @@ import type { RawCapture } from "@/lib/types";
 
 export async function GET() {
   const { data, error } = await supabaseAdmin()
-    .from("raw_captures")
+    .from("os_raw_captures")
     .select("*")
     .eq("user_id", USER_ID)
     .eq("classification->>kind", "journal")

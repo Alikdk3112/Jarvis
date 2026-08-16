@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { data, error } = await supabaseAdmin()
-    .from("tasks")
+    .from("os_tasks")
     .update(patch)
     .eq("id", id)
     .eq("user_id", USER_ID)
@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { error } = await supabaseAdmin().from("tasks").delete().eq("id", id).eq("user_id", USER_ID);
+  const { error } = await supabaseAdmin().from("os_tasks").delete().eq("id", id).eq("user_id", USER_ID);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

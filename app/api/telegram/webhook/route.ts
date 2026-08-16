@@ -14,14 +14,14 @@ import type { Urgency } from "@/lib/types";
 async function handleCallbackQuery(token: string, callback: any) {
   const [action, captureId, value] = String(callback.data).split(":");
   const { data: capture } = await supabaseAdmin()
-    .from("raw_captures")
+    .from("os_raw_captures")
     .select("routed_to, routed_id")
     .eq("id", captureId)
     .maybeSingle();
 
   if (capture?.routed_to === "tasks" && capture.routed_id) {
     const patch = action === "urgency" ? { urgency: value as Urgency } : { key: true };
-    await supabaseAdmin().from("tasks").update(patch).eq("id", capture.routed_id).eq("user_id", USER_ID);
+    await supabaseAdmin().from("os_tasks").update(patch).eq("id", capture.routed_id).eq("user_id", USER_ID);
   }
 
   await answerCallbackQuery(token, callback.id, "Updated.");

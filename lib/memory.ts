@@ -16,7 +16,7 @@ export async function writeMemoryChunk(params: {
   if (!openaiApiKey()) return;
   try {
     const embedding = await embedText(params.text);
-    await supabaseAdmin().from("memory_chunks").insert({
+    await supabaseAdmin().from("os_memory_chunks").insert({
       user_id: USER_ID,
       source_type: params.sourceType,
       source_id: params.sourceId,
@@ -33,7 +33,7 @@ export async function searchMemory(
   limit = 20,
 ): Promise<(MemoryChunk & { similarity: number })[]> {
   const embedding = await embedText(query);
-  const { data, error } = await supabaseAdmin().rpc("match_memory_chunks", {
+  const { data, error } = await supabaseAdmin().rpc("match_os_memory_chunks", {
     query_embedding: embedding,
     match_user_id: USER_ID,
     match_count: limit,

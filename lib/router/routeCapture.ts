@@ -11,7 +11,7 @@ export async function routeCapture(params: {
 }): Promise<RawCapture> {
   const admin = supabaseAdmin();
 
-  const { data: entities } = await admin.from("entities").select("id").eq("user_id", USER_ID);
+  const { data: entities } = await admin.from("os_entities").select("id").eq("user_id", USER_ID);
   const knownEntityIds = (entities ?? []).map((e) => e.id as string);
 
   const { classification, llm_source } = await classifyCapture(params.text, knownEntityIds);
@@ -21,7 +21,7 @@ export async function routeCapture(params: {
 
   if (classification.kind === "task") {
     const { data: task } = await admin
-      .from("tasks")
+      .from("os_tasks")
       .insert({
         user_id: USER_ID,
         title: classification.summary || params.text.slice(0, 140),
@@ -39,7 +39,7 @@ export async function routeCapture(params: {
   }
 
   const { data: capture, error } = await admin
-    .from("raw_captures")
+    .from("os_raw_captures")
     .insert({
       user_id: USER_ID,
       source: params.source,
@@ -57,7 +57,7 @@ export async function routeCapture(params: {
 
   await writeMemoryChunk({ sourceType: "capture", sourceId: capture.id, text: params.text });
 
-  await admin.from("audit_log").insert({
+  await admin.from("os_audit_log").insert({
     user_id: USER_ID,
     action: "capture",
     resource_type: "raw_captures",
