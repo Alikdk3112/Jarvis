@@ -10,3 +10,13 @@ export function localDateKey(date: Date = new Date()): string {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * The inverse of `localDateKey` — `new Date("2026-08-29")` parses as UTC
+ * midnight, which renders as the *previous* day west of UTC. This builds the
+ * date in local time instead, so weekday/day-number labels match the key.
+ */
+export function dateKeyToLocalDate(key: string): Date {
+  const [year = 1970, month = 1, day = 1] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}

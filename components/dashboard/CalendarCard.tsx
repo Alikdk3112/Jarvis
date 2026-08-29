@@ -2,15 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Panel } from "@/components/dashboard/Panel";
+import { dateKeyToLocalDate, localDateKey } from "@/lib/localDate";
 import type { CalendarEvent } from "@/lib/calendar/ical";
 
+/**
+ * Which local day an event falls on. Slicing the ISO string would answer for
+ * UTC instead, so an evening event lands in tomorrow's column west of UTC.
+ */
 function dayKey(iso: string): string {
-  return iso.slice(0, 10);
+  return localDateKey(new Date(iso));
 }
 
 export function CalendarCard() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [selected, setSelected] = useState<string>(dayKey(new Date().toISOString()));
+  const [selected, setSelected] = useState<string>(localDateKey());
   const nowRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -27,10 +32,10 @@ export function CalendarCard() {
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    return dayKey(d.toISOString());
+    return localDateKey(d);
   });
 
-  const todayKey = dayKey(new Date().toISOString());
+  const todayKey = localDateKey();
   const dayEvents = events.filter((e) => dayKey(e.start) === selected);
 
   return (
@@ -48,8 +53,8 @@ export function CalendarCard() {
                 selected === day ? "bg-accent-dim text-accent" : "bg-ink-1 text-ink-3"
               }`}
             >
-              <span>{new Date(day).toLocaleDateString(undefined, { weekday: "short" })}</span>
-              <span className="text-sm font-semibold">{new Date(day).getDate()}</span>
+              <span>{dateKeyToLocalDate(day).toLocaleDateString(undefined, { weekday: "short" })}</span>
+              <span className="text-sm font-semibold">{dateKeyToLocalDate(day).getDate()}</span>
               {count > 0 && <span className="mt-1 h-1 w-1 rounded-full bg-accent" />}
             </button>
           );

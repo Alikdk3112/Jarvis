@@ -46,7 +46,12 @@ fake data.
    creates every table, an ivfflat index for memory search, and enables RLS
    deny-all (the app talks to Postgres exclusively through the service-role key,
    which bypasses RLS — there's no end-user Postgres auth in this single-user build).
-3. From *Project Settings → API*, copy the Project URL and the service role key into
+3. Run `supabase/migrations/0002_daily_log_notes_merge.sql`. It adds the
+   `merge_os_daily_log_notes` function the app uses to write `os_daily_logs.notes`
+   — habits, nutrition, goals and the finance cron all write that one row, and
+   merging Postgres-side keeps two overlapping writers from dropping each
+   other's keys.
+4. From *Project Settings → API*, copy the Project URL and the service role key into
    `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`.
 
 ## Setting up the auth gate
@@ -56,6 +61,9 @@ Single password, HMAC-signed cookie — no OAuth needed for a single-user app.
 ```bash
 openssl rand -hex 32   # → AUTH_SECRET
 ```
+
+`AUTH_SECRET` must be hex — the app rejects anything else at startup rather than
+silently falling back to an all-zero signing key.
 
 Pick any memorable string for `DASHBOARD_PASSWORD`. Optionally set `API_SECRET` (any
 random string) so scripts/cron jobs can hit API routes with an `x-api-secret` header

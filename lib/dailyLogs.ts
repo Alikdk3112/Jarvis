@@ -26,21 +26,25 @@ export async function getDailyLogsRange(days: number): Promise<DailyLog[]> {
   return (data as DailyLog[]) ?? [];
 }
 
-/** Shallow-merges `patch` into that day's notes JSON — other modules' keys are preserved. */
+/**
+ * Shallow-merges `patch` into that day's notes JSON — other modules' keys are
+ * preserved. The merge happens Postgres-side (`jsonb ||`, see migration 0002)
+ * rather than read-modify-write in JS: habits, nutrition, goals and the
+ * finance cron all write this one row, and a JS merge lets two overlapping
+ * writers drop each other's keys.
+ */
 export async function upsertDailyLogNotes(
   logDate: string,
   patch: Partial<DailyLogNotes>,
 ): Promise<DailyLog> {
-  const existing = await getDailyLog(logDate);
-  const notes: DailyLogNotes = { ...(existing?.notes ?? {}), ...patch };
-
   const { data, error } = await supabaseAdmin()
-    .from("os_daily_logs")
-    .upsert(
-      { user_id: USER_ID, log_date: logDate, notes, updated_at: new Date().toISOString() },
-      { onConflict: "user_id,log_date" },
-    )
-    .select()
+    .rpc("merge_os_daily_log_notes", {
+      p_user_id: USER_ID,
+      p_log_date: logDate,
+      p_patch: patch,
+    })
+    // The function returns one composite row; .single() pins the response to a
+    // single object rather than leaving it to PostgREST's default shape.
     .single();
 
   if (error) throw new Error(error.message);

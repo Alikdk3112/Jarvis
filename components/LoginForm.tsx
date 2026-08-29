@@ -3,6 +3,16 @@
 import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+/**
+ * Only same-origin absolute paths are safe to push. `//evil.com` and
+ * `/\evil.com` are protocol-relative URLs the browser resolves off-origin.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith("/")) return "/";
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return "/";
+  return raw;
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,7 +34,7 @@ export function LoginForm() {
       setError("Wrong password.");
       return;
     }
-    router.push(searchParams.get("next") ?? "/");
+    router.push(safeNext(searchParams.get("next")));
     router.refresh();
   }
 

@@ -1,6 +1,7 @@
 import { GoogleAuth } from "google-auth-library";
 import ExcelJS from "exceljs";
 import { askClaudeJson } from "@/lib/ai/anthropic";
+import { normalizeFinanceSnapshot } from "@/lib/finance/snapshotShape";
 import type { FinanceSnapshot } from "@/lib/types";
 
 function serviceAccountCredentials() {
@@ -57,7 +58,7 @@ export async function parseWorkbookTabs(buffer: ArrayBuffer): Promise<Record<str
 export async function extractFinanceSnapshot(
   tabs: Record<string, unknown[][]>,
 ): Promise<FinanceSnapshot> {
-  return askClaudeJson<FinanceSnapshot>(
+  const raw = await askClaudeJson<unknown>(
     "You extract a net worth summary from a dump of spreadsheet tabs (2D row arrays, one per tab, " +
       "messy and unlabeled). " +
       'Return {"net_worth": number, "currency": string, "as_of": "YYYY-MM-DD", ' +
@@ -67,4 +68,8 @@ export async function extractFinanceSnapshot(
       "ambiguous for human review; leave it empty if there's nothing to flag.",
     JSON.stringify(tabs).slice(0, 60_000),
   );
+
+  const snapshot = normalizeFinanceSnapshot(raw);
+  if (!snapshot) throw new Error("finance extraction returned a non-object snapshot");
+  return snapshot;
 }

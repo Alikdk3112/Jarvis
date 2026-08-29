@@ -48,9 +48,11 @@ export async function loadCalendarEvents(icalUrl: string): Promise<CalendarEvent
       let next = iterator.next();
       while (next) {
         if (next.compare(windowEnd) > 0) break;
-        if (next.compare(windowStart) >= 0) {
-          const end = next.clone();
-          end.addDuration(event.duration);
+        const end = next.clone();
+        end.addDuration(event.duration);
+        // Keep an occurrence until it *ends*, matching the one-off branch
+        // below — filtering on start would drop a meeting the moment it began.
+        if (end.compare(windowStart) >= 0) {
           events.push({
             uid: `${event.uid}-${next.toString()}`,
             summary: event.summary ?? "(untitled)",

@@ -22,11 +22,20 @@ export async function askClaude(system: string, prompt: string): Promise<string>
   return block?.type === "text" ? block.text : "";
 }
 
+/**
+ * Strips a surrounding markdown fence if the model added one anyway — with or
+ * without a language tag (```json, ```JSON, or a bare ```).
+ */
+function stripCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```[a-zA-Z0-9]*[ \t]*\r?\n?([\s\S]*?)\r?\n?```$/);
+  return (fenced?.[1] ?? trimmed).trim();
+}
+
 /** Same as askClaude, but parses the response as JSON. Throws on malformed output. */
 export async function askClaudeJson<T>(system: string, prompt: string): Promise<T> {
   const text = await askClaude(`${system}\n\nRespond with JSON only, no prose, no markdown fences.`, prompt);
-  const cleaned = text.trim().replace(/^```json\s*|```$/g, "");
-  return JSON.parse(cleaned) as T;
+  return JSON.parse(stripCodeFence(text)) as T;
 }
 
 /** Streams Claude's reply as an async iterable of text chunks. */

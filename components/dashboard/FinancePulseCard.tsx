@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Panel } from "@/components/dashboard/Panel";
 import { useDemo } from "@/lib/demo/DemoContext";
 import { demoFinance } from "@/lib/demoData";
+import { formatMoney, normalizeFinanceSnapshot } from "@/lib/finance/snapshotShape";
 import type { FinanceSnapshot } from "@/lib/types";
 
 export function FinancePulseCard() {
@@ -13,12 +14,12 @@ export function FinancePulseCard() {
 
   function load() {
     if (demo) {
-      setSnapshot(demoFinance());
+      setSnapshot(normalizeFinanceSnapshot(demoFinance()));
       return;
     }
     fetch("/api/finance")
       .then((r) => r.json())
-      .then((data) => setSnapshot(data.snapshot))
+      .then((data) => setSnapshot(normalizeFinanceSnapshot(data.snapshot)))
       .catch(() => setSnapshot(null));
   }
 
@@ -48,16 +49,14 @@ export function FinancePulseCard() {
       ) : (
         <>
           <div className="mono text-2xl font-semibold text-ink-4">
-            {snapshot.net_worth.toLocaleString(undefined, { style: "currency", currency: snapshot.currency })}
+            {formatMoney(snapshot.net_worth, snapshot.currency)}
           </div>
-          <div className="text-xs text-ink-3">as of {snapshot.as_of}</div>
+          {snapshot.as_of && <div className="text-xs text-ink-3">as of {snapshot.as_of}</div>}
           <ul className="mt-2 flex flex-col gap-1">
-            {snapshot.categories.map((cat) => (
-              <li key={cat.name} className="flex items-center justify-between text-sm">
+            {snapshot.categories.map((cat, i) => (
+              <li key={`${cat.name}-${i}`} className="flex items-center justify-between text-sm">
                 <span className="text-ink-3">{cat.name}</span>
-                <span className="mono text-ink-4">
-                  {cat.value.toLocaleString(undefined, { style: "currency", currency: snapshot.currency })}
-                </span>
+                <span className="mono text-ink-4">{formatMoney(cat.value, snapshot.currency)}</span>
               </li>
             ))}
           </ul>
