@@ -27,6 +27,11 @@ function bufferSource(bytes: Uint8Array): BufferSource {
 
 function hexToBytes(hex: string): Uint8Array {
   const clean = hex.trim();
+  // Without this check a non-hex secret becomes an all-zero key (parseInt →
+  // NaN → 0) and every session cookie is trivially forgeable, silently.
+  if (clean.length === 0 || clean.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(clean)) {
+    throw new Error("AUTH_SECRET must be a non-empty, even-length hex string");
+  }
   const bytes = new Uint8Array(clean.length / 2);
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);

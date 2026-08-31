@@ -20,7 +20,7 @@ export async function routeCapture(params: {
   let routed_id: string | null = null;
 
   if (classification.kind === "task") {
-    const { data: task } = await admin
+    const { data: task, error: taskError } = await admin
       .from("os_tasks")
       .insert({
         user_id: USER_ID,
@@ -32,10 +32,12 @@ export async function routeCapture(params: {
       })
       .select()
       .single();
-    if (task) {
-      routed_to = "tasks";
-      routed_id = task.id;
-    }
+    // Fail loudly: a swallowed error here writes a capture with routed_to
+    // null, replies "Captured", and leaves the urgency buttons pointing at a
+    // task that was never created.
+    if (taskError || !task) throw new Error(taskError?.message ?? "failed to write os_tasks");
+    routed_to = "tasks";
+    routed_id = task.id;
   }
 
   const { data: capture, error } = await admin
